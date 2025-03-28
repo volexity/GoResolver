@@ -1,0 +1,1 @@
+"""Symbol extraction module."""

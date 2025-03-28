@@ -1,0 +1,174 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[project]
+name = "goresolver"
+dynamic = ["version"]
+description = "A tool generating and comparing control flow graphs of GO samples."
+readme = "README.md"
+requires-python = ">=3.12"
+keywords = []
+authors = [
+  { name = "Killian Raimbaud", email = "kraimbaud@volexity.com" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "License :: Other/Proprietary License",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = [
+  "gographer~=1.0.0",
+  "gostrap~=1.0.0",
+  "pygments~=2.18.0",
+  "pygobuildinfo~=0.1.23",
+  "lief~=0.16.4",
+  "yara-python~=4.5.1"
+]
+
+[project.scripts]
+goresolver = "volexity.goresolver.cli:run_cli"
+
+[project.urls]
+Documentation = "https://gitlab.research.volexity.com/threat-intel/gographer/-/blob/master/README.md"
+Issues = "https://gitlab.research.volexity.com/threat-intel/gographer/-/issues"
+Source = "https://gitlab.research.volexity.com/threat-intel/gographer"
+
+[envs.hatch-static-analysis]
+config-path = "none"
+
+[tool.coverage.run]
+source_pkgs = ["volexity.goresolver"]
+branch = true
+parallel = true
+omit = [
+  "src/volexity/goresolver/_version.py",
+]
+
+[tool.coverage.paths]
+goresolver = ["src/volexity/goresolver", "*/goresolver/src/volexity/goresolver"]
+tests = ["tests", "*/goresolver/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/volexity/goresolver/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/volexity"]
+
+[tool.hatch.envs.default]
+extra-dependencies = [
+  "mypy~=1.13",
+
+  "types-pygments",
+]
+
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/volexity/goresolver tests}"
+
+[tool.hatch.envs.hatch-static-analysis]
+config-path = "none"
+dependencies = ["ruff~=0.9"]
+
+[tool.hatch.envs.hatch-test]
+extra-dependencies = []
+
+[[tool.hatch.envs.hatch-test.matrix]]
+python = ["3.13", "3.12"]
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.mypy]
+explicit_package_bases = true
+files = ["src"]
+mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = [
+  "yara.*",
+]
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+  "C901",
+  "COM812",
+  "D105",
+  "D107",
+  "ERA001",
+  "FBT001",
+  "FBT002",
+  "FIX001",
+  "FIX002",
+  "FIX003",
+  "FIX004",
+  "G004",
+  "ISC001",
+  "PLR0912",
+  "PLR0913",
+  "PTH123",
+  "TD001",
+  "TD002",
+  "TD003",
+  "TID252",
+]
+pydocstyle = { convention = 'google' }
+
+[tool.ruff.lint.per-file-ignores]
+"Plugin/**/*.py" = [
+  "A004",
+  "ANN001",
+  "ANN201",
+  "ANN204",
+  "ARG002",
+  "B904",
+  "C417",
+  "D100",
+  "D101",
+  "D102",
+  "D103",
+  "D104",
+  "E402",
+  "N802",
+  "N999",
+  "PGH003",
+  "SIM105",
+  "T201",
+  "TC002",
+  "TC003",
+  "TC004",
+  "TRY400",
+  "TRY401",
+]
+"**/tests/**/*" = [
+  "ARG001",
+  "D100",
+  "D103",
+  "D104",
+  "PLC1901",
+  "PLR2004",
+  "PLR6301",
+  "S",
+]
+"**/_version.py" = [
+  "D100",
+  "SIM108",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["volexity.goresolver"]

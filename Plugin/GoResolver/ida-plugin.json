@@ -1,0 +1,7 @@
+{
+  "IDAMetadataDescriptorVersion": 1,
+  "plugin": {
+    "name": "GoResolver",
+    "entryPoint": "goresolver_ida.py"
+  }
+}

@@ -1,0 +1,55 @@
+name: Upload Python Package
+
+on:
+    push:
+        tags: [v*]
+
+permissions:
+    contents: read
+
+jobs:
+    release-build:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                python-version: '>=3.10'
+
+            - name: Install Hatch
+              run: |
+                python -V
+                pip install --upgrade hatch
+
+            - name: Build release distributions
+              run: hatch build
+
+            - name: Upload release distributions
+              uses: actions/upload-artifact@v4
+              with:
+                name: release-dists
+                path: dist/
+
+    pypi-publish:
+        runs-on: ubuntu-latest
+        needs: [release-build]
+
+        permissions:
+            id-token: write
+
+        environment:
+            name: pypi
+            url: https://pypi.org/p/goresolver
+
+        steps:
+            - name: Retrieve release distributions
+              uses: actions/download-artifact@v4
+              with:
+                  name: release-dists
+                  path: dist/
+            - name: Publish release distributions to PyPI
+              uses: pypa/gh-action-pypi-publish@v1.12.4
+              with:
+                skip-existing: true
