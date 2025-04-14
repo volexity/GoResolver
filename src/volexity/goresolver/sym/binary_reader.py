@@ -11,7 +11,7 @@ from .slice import Slice
 class BinaryReader:
     """The BinaryReader allows the parsing of binary data in a stream-like fashion."""
 
-    def __init__(self, binary: Binary | bytes, arch: Arch, offset: int = 0) -> None:
+    def __init__(self, binary: Binary | bytes, arch: Arch, offset: int | None = None) -> None:
         """Initialize a new BinaryReader.
 
         Args:
@@ -21,7 +21,7 @@ class BinaryReader:
         """
         self._data: Final[bytes] = binary if isinstance(binary, bytes) else binary.data
         self._arch: Final[Arch] = arch
-        self.offset: int = offset
+        self.offset: int = offset if offset is not None else 0
 
     @property
     def data(self) -> bytes:
@@ -117,7 +117,7 @@ class BinaryReader:
 
         for address in range(self.offset, len(self._data) - window_size, self._arch.quantum):
             if value == self._arch.endian.parse_int(self._data, window_size, address):
-                self.offset = address
+                self.offset = address + window_size
                 return address
         self.offset = len(self.data)
 

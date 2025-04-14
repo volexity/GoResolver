@@ -7,12 +7,12 @@ from logging import INFO, Logger, basicConfig, getLogger
 from pathlib import Path
 from typing import Final
 
+from gographer import CompareReport
 from pygments import highlight
 from pygments.formatters import TerminalFormatter
 from pygments.lexers.web import JsonLexer
-from volexity.gostrap.sample_generator import SampleGenerator
 
-from gographer import CompareReport
+from volexity.gostrap.sample_generator import SampleGenerator
 
 from .go_compare import GoCompare
 from .models.cli_arguments import CLIArguments

@@ -1,6 +1,7 @@
 """Parses and represent the PcLineTable cross all majors Go version."""
 
 import logging
+from collections.abc import Generator
 from typing import Final
 
 from .arch import Arch
@@ -119,11 +120,16 @@ class PcLineTable:
         Returns:
             Parsed architecture from the PcLineTable.
         """
-        quantum: Final[int] = binary.data[offset + QUANTUM_OFFSET]  # x86: 1, ARM: 4
-        pointer_size: Final[int] = binary.data[offset + POINTER_SIZE_OFFSET]  # x86: 4, x86_64: 8
+        msg: Final[str] = "Invalid Architecture!"
+
+        try:
+            quantum: Final[int] = binary.data[offset + QUANTUM_OFFSET]  # x86: 1, ARM: 4
+            pointer_size: Final[int] = binary.data[offset + POINTER_SIZE_OFFSET]  # x86: 4, x86_64: 8
+        except IndexError as e:
+            logger.debug(f"PCLineTable offset out of range ! {offset:#x}")
+            raise ValueError(msg) from e
 
         if quantum != binary.arch.quantum or pointer_size != binary.arch.pointer_size:
-            msg = "Invalid Architecture!"
             raise ValueError(msg)
 
         return Arch(endian, quantum, pointer_size)
@@ -235,8 +241,8 @@ class PcLineTable:
         self.end_pc = bin_reader.read_int(func_tab_field_size) + entry_pc
 
     @staticmethod
-    def localize_walk(binary: Binary, offset: int = 0) -> int | None:
-        """Localize the PcLineTable by walking the binary, and returns its contents.
+    def localize_walk(binary: Binary, offset: int = 0) -> Generator[int]:
+        """Localize the PcLineTable by walking the binary, and returns its offset.
 
         Args:
             binary: The the binary being analyzed.
@@ -249,8 +255,7 @@ class PcLineTable:
         for pclntab_address in range(offset, len(binary) - window_size):
             if _ := PcLineMagic.check_table_type(binary.data, pclntab_address):
                 logger.debug(f"Localized symbol table by walking at address: {pclntab_address:#0x}:unknown")
-                return pclntab_address
-        return None
+                yield pclntab_address
 
     @staticmethod
     def localize_symbol(binary: Binary, start_symbol: str, end_symbol: str) -> int | None:

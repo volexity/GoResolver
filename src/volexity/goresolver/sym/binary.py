@@ -125,7 +125,10 @@ class Binary:
         if isinstance(virtual_address, lief.lief_errors):
             msg = "Invalid offset!"
             raise TypeError(msg)
-        return self._parsed_binary.imagebase + virtual_address
+
+        if self.format == BinaryFormat.PE:  # Resolve RVA for PEs
+            return virtual_address + self._parsed_binary.imagebase
+        return virtual_address
 
     def get_offset_from_address(self, address: int) -> int:
         """Get the file offset corresponding to a virtual address.
@@ -136,8 +139,11 @@ class Binary:
         Returns:
             The translated file offset
         """
-        for section in reversed(self._parsed_binary.sections):
-            section_address: int = self.base_address + section.virtual_address
+        for section in sorted(self._parsed_binary.sections, key=lambda x: x.virtual_address, reverse=True):
+            section_address: int = section.virtual_address
+            if self.format == BinaryFormat.PE:  # Resolve RVA for PEs
+                section_address += self.base_address
+
             if address >= section_address:
                 return address - section_address + section.offset
         msg = "Invalid address"

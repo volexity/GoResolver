@@ -15,10 +15,10 @@ VOLEXITY_LIBS_INSTALLED: bool
 try:
     raise ImportError  # Analysis feature dissabled. # noqa: TRY301
 
+    from gographer import CompareReport
+
     from volexity.goresolver.go_compare import GoCompare
     from volexity.gostrap.sample_generator import SampleGenerator
-
-    from gographer import CompareReport
 
     VOLEXITY_LIBS_INSTALLED = True
 except ImportError:

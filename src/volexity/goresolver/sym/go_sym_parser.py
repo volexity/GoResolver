@@ -7,6 +7,7 @@
 # Ref: https://github.com/golang/go/blob/master/src/cmd/link/internal/ld/pcln.go
 
 import logging
+from collections.abc import Generator
 from pathlib import Path
 from typing import Final
 
@@ -39,30 +40,52 @@ class GoSymParser:
             Dictionary of extracted symbols in a (entry -> name) configuration.
         """
         binary: Final[Binary] = Binary(sample_path)
-        moduledata_table: ModuleData | None = None
-
-        if pcline_table_offset := GoSymParser._get_pclinetable_offset(binary):
-            # Step1 - Try straightforward aproach.
-            pclinetable_address: Final[int] = binary.get_address_from_offset(pcline_table_offset)
-            try:
-                if offset := ModuleData.localize_walk(binary, pclinetable_address, binary.arch):  # noqa: SIM102
-                    if moduledata := GoSymParser._get_moduledata_table(binary, [offset]):
-                        moduledata_table = moduledata
-            except ValueError:
-                pass
-
-        if moduledata_table is None:  # noqa: SIM102
-            # Step2 - Try the backup approach
-            if moduledata := GoSymParser._get_moduledata_table(binary, ModuleData.localize_signature(binary)):
-                moduledata_table = moduledata
-
         symbols: Final[dict[int, str]] = {}
-        if moduledata_table is not None:
+
+        if moduledata_table := GoSymParser._extract_moduledata(binary):
+            logger.info(
+                f"Found valid PcLineTable <-> ModuleData couple at "
+                f"{moduledata_table.pclinetable.offset:#0x} <-> {moduledata_table.offset:#0x}."
+            )
             pcline_table: PcLineTable = moduledata_table.pclinetable
             for pc, symbol in pcline_table.fct_table.items():
                 symbols[pc] = symbol.name
 
         return symbols
+
+    @staticmethod
+    def _extract_moduledata(binary: Binary) -> ModuleData | None:
+        """Attempts to extract the ModuleData from a binary by rearching for a valid ModuleData <-> PcLineTable couple.
+
+        Args:
+            binary: The binary to extract the ModuleData from
+
+        Returns:
+            The extracted moduledata (if any).
+        """
+        # Step1 - Try straightforward aproach.
+        logger.info("Searching for a valid PcLineTable <-> ModuleData couple ...")
+        potential_pclinetable_offsets: Final[Generator[int]] = GoSymParser._get_pclinetable_offset(binary)
+        for pcline_table_offset in potential_pclinetable_offsets:
+            logger.info(f"Localized PcLineTable candidate at {pcline_table_offset:#0x} !")
+            pclinetable_address: int = binary.get_address_from_offset(pcline_table_offset)
+
+            potential_moduledata_offsets: Generator[int] = ModuleData.localize_walk(
+                binary, pclinetable_address, binary.arch
+            )
+            for moduledata_offset in potential_moduledata_offsets:
+                if moduledata := GoSymParser._get_moduledata_table(binary, [moduledata_offset]):
+                    return moduledata
+
+            logger.error(f"PcLineTable candidate at {pcline_table_offset:#0x} is invalid !")
+
+        # Step2 - Try the backup approach
+        logger.warning("Conventional extraction failed, attempting backup ...")
+        if moduledata := GoSymParser._get_moduledata_table(binary, ModuleData.localize_signature(binary)):
+            return moduledata
+
+        logger.critical("Unable to find a valid PcLineTable <-> ModuleData couple !")
+        return None
 
     @staticmethod
     def _get_magic_from_buildinfo(binary: Binary) -> PcLineMagic | None:
@@ -111,7 +134,7 @@ class GoSymParser:
         for moduledata_offset in probable_moduledata_offsets:
             if moduledata_offset not in offsets_attempts:
                 offsets_attempts.append(moduledata_offset)
-                logger.debug(f"Localized ModuleData table at {moduledata_offset:#0x}!")
+                logger.info(f"Localized ModuleData candidate at {moduledata_offset:#0x} !")
 
                 if magic is not None:
                     try:
@@ -125,7 +148,7 @@ class GoSymParser:
                         return GoSymParser._init_moduledata_table(binary, moduledata_offset, magic)
                     except ValueError:
                         continue
-                logger.debug(f"ModuleData at {moduledata_offset:#0x} is invalid !")
+                logger.error(f"ModuleData candidate at {moduledata_offset:#0x} is invalid !")
         return None
 
     @staticmethod
@@ -157,7 +180,7 @@ class GoSymParser:
                 raise ValueError(msg)
 
     @staticmethod
-    def _get_pclinetable_offset(binary: Binary) -> int | None:
+    def _get_pclinetable_offset(binary: Binary) -> Generator[int]:
         """Attempts to localize the PcLineTable offset.
 
         Args:
@@ -166,30 +189,26 @@ class GoSymParser:
         Returns:
             The localized PcLineTable offset (if successful).
         """
-        table_offset: int | None = None
+        potential_table_offsets: Generator[int] | None = None
         match binary.format:
             case BinaryFormat.PE:
                 logger.debug("Parsing PE file ...")
-                table_offset = GoSymParser._locPETable(binary)
+                potential_table_offsets = GoSymParser._loc_pe_table(binary)
             case BinaryFormat.ELF:
                 logger.debug("Parsing ELF file ...")
-                table_offset = GoSymParser._locElfTable(binary)
+                potential_table_offsets = GoSymParser._loc_elf_table(binary)
             case BinaryFormat.MACH_O:
                 logger.debug("Parsing MACH-O file ...")
-                table_offset = GoSymParser._locMachOTable(binary)
+                potential_table_offsets = GoSymParser._loc_macho_table(binary)
             case _:
                 msg = "Unsupported binary type!"
                 raise ValueError(msg)
 
-        if table_offset is not None:
-            logger.debug(f"PcLineTable found at offset : {table_offset:#0x}")
-            return table_offset
-
-        logger.debug("Invalid PcLineTable!")
-        return None
+        if potential_table_offsets is not None:
+            yield from potential_table_offsets
 
     @staticmethod
-    def _locPETable(binary: Binary) -> int | None:  # noqa: N802
+    def _loc_pe_table(binary: Binary) -> Generator[int]:
         """Localize the PcLineTable in a PE file.
 
         Args:
@@ -200,22 +219,18 @@ class GoSymParser:
         """
         logger.debug("Attempt _locTableSym")
         if table_offset := PcLineTable.localize_symbol(binary, "runtime.pclntab", "runtime.epclntab"):
-            return table_offset
+            yield table_offset
         if rdata := binary.get_section_offset(".rdata"):
             logger.debug("Attempt _locTableWalk .rdata")
-            if table_offset := PcLineTable.localize_walk(binary, rdata):
-                return table_offset
+            yield from PcLineTable.localize_walk(binary, rdata)
         if data := binary.get_section_offset(".data"):
             logger.debug("Attempt _locTableWalk .data")
-            if table_offset := PcLineTable.localize_walk(binary, data):
-                return table_offset
+            yield from PcLineTable.localize_walk(binary, data)
         logger.debug("Attempt _locTableWalk large")
-        if table_offset := PcLineTable.localize_walk(binary):
-            return table_offset
-        return None
+        yield from PcLineTable.localize_walk(binary)
 
     @staticmethod
-    def _locElfTable(binary: Binary) -> int | None:  # noqa: N802
+    def _loc_elf_table(binary: Binary) -> Generator[int]:
         """Localize the PcLineTable in a ELF file.
 
         Args:
@@ -225,13 +240,11 @@ class GoSymParser:
             The offset to the PcLineTable.
         """
         if pclntab_sec := binary.get_section_offset(".gopclntab"):
-            return pclntab_sec
-        if table_offset := PcLineTable.localize_walk(binary):
-            return table_offset
-        return None
+            yield pclntab_sec
+        yield from PcLineTable.localize_walk(binary)
 
     @staticmethod
-    def _locMachOTable(binary: Binary) -> int | None:  # noqa: N802
+    def _loc_macho_table(binary: Binary) -> Generator[int]:
         """Localize the PcLineTable in a Mach-O file.
 
         Args:
@@ -241,7 +254,5 @@ class GoSymParser:
             The offset to the PcLineTable.
         """
         if pclntab_sec := binary.get_section_offset("__gopclntab"):
-            return pclntab_sec
-        if table_offset := PcLineTable.localize_walk(binary):
-            return table_offset
-        return None
+            yield pclntab_sec
+        yield from PcLineTable.localize_walk(binary)

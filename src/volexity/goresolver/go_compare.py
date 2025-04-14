@@ -6,10 +6,10 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Final
 
-from pygobuildinfo import get_go_build_info  # type: ignore[import-untyped]
-from volexity.gostrap.sample_generator import ArchTypes, PlatformTypes, SampleGenerator
-
 from gographer import CompareReport, Disassembly, Grapher
+from pygobuildinfo import get_go_build_info  # type: ignore[import-untyped]
+
+from volexity.gostrap.sample_generator import ArchTypes, PlatformTypes, SampleGenerator
 
 from .models.go_version import GOVersion
 

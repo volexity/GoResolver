@@ -2,6 +2,7 @@
 
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Generator
 from typing import Final
 
 from ..arch import Arch
@@ -99,7 +100,9 @@ class ModuleData(ABC):
             raise ValueError(msg)
 
     @staticmethod
-    def localize_walk(binary: Binary, pclinetable_address: int, arch: Arch, offset: int | None = None) -> int | None:
+    def localize_walk(
+        binary: Binary, pclinetable_address: int, arch: Arch, offset: int | None = None
+    ) -> Generator[int]:
         """Localize ModuleData by walking the binary (if successful).
 
         Args:
@@ -111,14 +114,14 @@ class ModuleData(ABC):
         Returns:
             The ModuleData file offset (if any).
         """
-        reader: Final[BinaryReader] = BinaryReader(binary, arch)
-        moduledata_offset: Final[int | None] = reader.walk(pclinetable_address, arch.pointer_size, offset)
-        if moduledata_offset is None:
-            msg = "Couldn't localize the ModuleData table !"
-            raise ValueError(msg)
-        logger.debug(f"ModuleData found at offset: {moduledata_offset:#0x}")
+        reader: Final[BinaryReader] = BinaryReader(binary, arch, offset)
 
-        return moduledata_offset
+        while True:
+            if moduledata_offset := reader.walk(pclinetable_address, arch.pointer_size):
+                logger.debug(f"ModuleData found at offset: {moduledata_offset:#0x}")
+                yield moduledata_offset
+            else:
+                return
 
     @staticmethod
     def localize_signature(binary: Binary) -> list[int]:
