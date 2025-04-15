@@ -11,8 +11,7 @@ from collections.abc import Generator
 from pathlib import Path
 from typing import Final
 
-from pygobuildinfo import get_go_build_info  # type: ignore[import-untyped]
-
+from ..buildinfo.go_buildinfo_parser import BuildInfo
 from ..models.go_version import GOVersion
 from .binary import Binary, BinaryFormat
 from .module_data_models.module_data import ModuleData
@@ -98,8 +97,8 @@ class GoSymParser:
             The extracted Go version magic.
         """
         try:
-            build_info: Final[dict[str, str]] = get_go_build_info(str(binary.path))
-            version: Final[GOVersion] = GOVersion(build_info["GoVersion"])
+            build_info: Final[BuildInfo] = BuildInfo(binary)
+            version: Final[GOVersion] = GOVersion(build_info.version)
             return PcLineMagic.from_version(version)
         except ValueError:
             return None
@@ -220,12 +219,12 @@ class GoSymParser:
         logger.debug("Attempt _locTableSym")
         if table_offset := PcLineTable.localize_symbol(binary, "runtime.pclntab", "runtime.epclntab"):
             yield table_offset
-        if rdata := binary.get_section_offset(".rdata"):
+        if rdata := binary.get_section(".rdata"):
             logger.debug("Attempt _locTableWalk .rdata")
-            yield from PcLineTable.localize_walk(binary, rdata)
-        if data := binary.get_section_offset(".data"):
+            yield from PcLineTable.localize_walk(binary, rdata.offset)
+        if data := binary.get_section(".data"):
             logger.debug("Attempt _locTableWalk .data")
-            yield from PcLineTable.localize_walk(binary, data)
+            yield from PcLineTable.localize_walk(binary, data.offset)
         logger.debug("Attempt _locTableWalk large")
         yield from PcLineTable.localize_walk(binary)
 
@@ -239,8 +238,8 @@ class GoSymParser:
         Returns:
             The offset to the PcLineTable.
         """
-        if pclntab_sec := binary.get_section_offset(".gopclntab"):
-            yield pclntab_sec
+        if pclntab_sec := binary.get_section(".gopclntab"):
+            yield pclntab_sec.offset
         yield from PcLineTable.localize_walk(binary)
 
     @staticmethod
@@ -253,6 +252,6 @@ class GoSymParser:
         Returns:
             The offset to the PcLineTable.
         """
-        if pclntab_sec := binary.get_section_offset("__gopclntab"):
-            yield pclntab_sec
+        if pclntab_sec := binary.get_section("__gopclntab"):
+            yield pclntab_sec.offset
         yield from PcLineTable.localize_walk(binary)

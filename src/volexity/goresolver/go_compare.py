@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import Final
 
 from gographer import CompareReport, Disassembly, Grapher
-from pygobuildinfo import get_go_build_info  # type: ignore[import-untyped]
 
 from volexity.gostrap.sample_generator import ArchTypes, PlatformTypes, SampleGenerator
 
+from .buildinfo.go_buildinfo_parser import BuildInfo
 from .models.go_version import GOVersion
 
 logger: Final[logging.Logger] = logging.getLogger(__name__)
@@ -133,17 +133,21 @@ class GoCompare:
         Returns:
             The GO version used by the sample.
         """
+        go_version: str
+
         try:  # Try to extract the GO version from the build info.
-            build_info: Final[dict] = get_go_build_info(self.__sample_path.as_posix())
-            if build_info["GoVersion"] == "unknown":
-                raise KeyError  # noqa: TRY301
-            return build_info["GoVersion"]
-        except KeyError:  # If obfuscated then tries to assert the GO version using a similarity based approach.
+            build_info: Final[BuildInfo] = BuildInfo(self.__sample_path)
+            if build_info.version not in self.__sample_generator.get_available_go_versions():
+                raise ValueError  # noqa: TRY301
+            go_version = build_info.version
+        except ValueError:  # If obfuscated then tries to assert the GO version using a similarity based approach.
             candidates: Final[list[str]] = sorted(
                 {*self.__sample_generator.get_installed_go_versions(), *self.get_latest_versions()}
             )
             logger.info(f"Obfuscated GO version ! Testing candidates : {candidates}")
-            return self.__compare_go_runtimes(candidates)
+            go_version = self.__compare_go_runtimes(candidates)
+
+        return go_version
 
     def __compare_go_runtimes(self, go_versions: list[str]) -> str:
         """Compare the runtimes of the specified GO versions with the sample and return the best match.

@@ -1,9 +1,10 @@
 """Load and provide abstract access to the binary across PE, ELF and Mach-O exectuable formats."""
 
 import logging
-from enum import Enum, auto
+from collections.abc import Iterable
+from enum import Enum, IntFlag, auto
 from pathlib import Path
-from typing import Final
+from typing import Final, cast
 
 import lief
 
@@ -18,6 +19,131 @@ class BinaryFormat(Enum):
     PE = auto()
     ELF = auto()
     MACH_O = auto()
+
+
+class BinarySection:
+    """Abstraction of a section withing a Binary."""
+
+    class Flags(IntFlag):
+        """Section's access flags."""
+
+        Initialized = auto()
+        Read = auto()
+        Write = auto()
+        Execute = auto()
+
+    def __init__(self, section: lief.Section, bin_format: BinaryFormat) -> None:
+        """Initialize a new BinarySection.
+
+        Args:
+            section: The underlying section data.
+            bin_format: The binary type to parse the section of.
+        """
+        self._name: Final[str] = str(section.name)
+        self._offset: Final[int] = section.offset
+        self._size: Final[int] = section.size
+
+        self._flags: BinarySection.Flags = BinarySection.Flags(0)
+        match bin_format:
+            case BinaryFormat.PE:
+                self._parse_pe_section(section)
+            case BinaryFormat.ELF:
+                self._parse_elf_section(section)
+            case BinaryFormat.MACH_O:
+                self._parse_macho_section(section)
+
+    def _parse_pe_section(self, section: lief.Section) -> None:
+        """Parse a BinarySection from a PE file.
+
+        Args:
+            section: The underlying section data.
+        """
+        pe_section: lief.PE.Section = cast("lief.PE.Section", section)
+
+        for characteristic in pe_section.characteristics_lists:
+            match characteristic:
+                case lief.PE.Section.CHARACTERISTICS.CNT_INITIALIZED_DATA:
+                    self._flags |= BinarySection.Flags.Initialized
+                case lief.PE.Section.CHARACTERISTICS.MEM_READ:
+                    self._flags |= BinarySection.Flags.Read
+                case lief.PE.Section.CHARACTERISTICS.MEM_WRITE:
+                    self._flags |= BinarySection.Flags.Write
+                case lief.PE.Section.CHARACTERISTICS.MEM_EXECUTE:
+                    self._flags |= BinarySection.Flags.Execute
+                case _:
+                    pass
+
+    def _parse_elf_section(self, section: lief.Section) -> None:
+        """Parse a BinarySection from an ELF file.
+
+        Args:
+            section: The underlying section data.
+        """
+        elf_section: lief.ELF.Section = cast("lief.ELF.Section", section)
+
+        for elf_segment in elf_section.segments:
+            for flag in elf_segment.flags:
+                match flag:
+                    case lief.ELF.Segment.FLAGS.R:
+                        self._flags |= BinarySection.Flags.Read
+                    case lief.ELF.Segment.FLAGS.W:
+                        self._flags |= BinarySection.Flags.Write
+                    case lief.ELF.Segment.FLAGS.X:
+                        self._flags |= BinarySection.Flags.Execute
+                    case _:
+                        pass
+
+    def _parse_macho_section(self, section: lief.Section) -> None:
+        """Parse a BinarySection from a Mach-O file.
+
+        Args:
+            section: The underlying section data.
+        """
+        macho_section: Final[lief.MachO.Section] = cast("lief.MachO.Section", section)
+        protection: Final[int] = macho_section.segment.init_protection & macho_section.segment.max_protection
+
+        if protection & int(lief.MachO.SegmentCommand.VM_PROTECTIONS.R):
+            self._flags |= BinarySection.Flags.Read
+        if protection & int(lief.MachO.SegmentCommand.VM_PROTECTIONS.W):
+            self._flags |= BinarySection.Flags.Write
+        if protection & int(lief.MachO.SegmentCommand.VM_PROTECTIONS.X):
+            self._flags |= BinarySection.Flags.Execute
+
+    @property
+    def name(self) -> str:
+        """Return the name of the binary section.
+
+        Returns:
+            The name of the binary section.
+        """
+        return self._name
+
+    @property
+    def offset(self) -> int:
+        """Return the offset of the binary section.
+
+        Returns:
+            The offset of the binary section.
+        """
+        return self._offset
+
+    @property
+    def size(self) -> int:
+        """Reeturn the size of the binary section.
+
+        Returns:
+            The size of the binary section.
+        """
+        return self._size
+
+    @property
+    def flags(self) -> "BinarySection.Flags":
+        """Returns the flags of the binary section.
+
+        Returns:
+            The flags of the binary section.
+        """
+        return self._flags
 
 
 class Binary:
@@ -61,8 +187,12 @@ class Binary:
                         case _:
                             msg = "Unsupported architecture"
                             raise ValueError(msg)  # noqa: TRY301
+
+                    self._sections: list[BinarySection] = [
+                        BinarySection(section, self._format) for section in self._parsed_binary.sections
+                    ]
                 else:
-                    msg = "Couln't parse input binary!"
+                    msg = "Couln't parse input binary"
                     raise Exception(msg)  # noqa: TRY002,TRY301
         except Exception:
             logger.exception("Uncaught exception")
@@ -102,6 +232,15 @@ class Binary:
             The CPU architecture of the binary.
         """
         return self._arch
+
+    @property
+    def sections(self) -> Iterable[BinarySection]:
+        """Returns the list of BinarySection of the binary.
+
+        Returns:
+            The list of BinarySections of the binary.
+        """
+        return self._sections
 
     @property
     def base_address(self) -> int:
@@ -149,16 +288,16 @@ class Binary:
         msg = "Invalid address"
         raise ValueError(msg)
 
-    def get_section_offset(self, name: str) -> int | None:
+    def get_section(self, name: str) -> BinarySection | None:
         """Get the section with the specified name (if any).
 
         Args:
             name: The name of the section to retrieve.
 
         Returns:
-            The retrieved section offet (if any).
+            The retrieved section (if any).
         """
-        return next((section.offset for section in self._parsed_binary.sections if section.name == name), None)
+        return next((section for section in self._sections if section.name == name), None)
 
     def get_symbol_offset(self, name: str) -> int | None:
         """Get the value of the symbol with the supplied name (if any).

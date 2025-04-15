@@ -25,7 +25,6 @@ dependencies = [
   "gographer~=1.0.0",
   "gostrap~=1.0.0",
   "pygments~=2.18.0",
-  "pygobuildinfo~=0.1.23",
   "lief~=0.16.4",
   "yara-python~=4.5.1"
 ]

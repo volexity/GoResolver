@@ -269,7 +269,7 @@ class PcLineTable:
         Returns:
             The offset to the PcLineTable.
         """
-        if sec_rdata := binary.get_section_offset(".rdata"):  # .rdata in pe only
+        if sec_rdata := binary.get_section(".rdata"):  # .rdata in pe only
             # Get symbols
             sym_pclntab: Final[int | None] = binary.get_symbol_offset(start_symbol)
             sym_epclntab: Final[int | None] = binary.get_symbol_offset(end_symbol)
@@ -277,7 +277,7 @@ class PcLineTable:
             if sym_pclntab is not None and sym_epclntab is not None:
                 # Compute value and size
                 pclntab_size: Final[int] = sym_epclntab - sym_pclntab
-                pclntab_address: Final[int] = sec_rdata + sym_pclntab
+                pclntab_address: Final[int] = sec_rdata.offset + sym_pclntab
 
                 logger.debug(
                     f"Localized symbol table conventionally at address: {pclntab_address:#0x}:{pclntab_size:#0x}"
