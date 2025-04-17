@@ -29,16 +29,16 @@ class GoSymParser:
     """Go Symbol Parser."""
 
     @staticmethod
-    def extract(sample_path: Path) -> dict[int, str]:
+    def extract(sample_bin: Path | Binary) -> dict[int, str]:
         """Extract the symbols from a Go binary.
 
         Args:
-            sample_path: Path to the Go binary to extract the samples from.
+            sample_bin: The Go binary to extract the samples from.
 
         Returns:
             Dictionary of extracted symbols in a (entry -> name) configuration.
         """
-        binary: Final[Binary] = Binary(sample_path)
+        binary: Final[Binary] = sample_bin if isinstance(sample_bin, Binary) else Binary(sample_bin)
         symbols: Final[dict[int, str]] = {}
 
         if moduledata_table := GoSymParser._extract_moduledata(binary):

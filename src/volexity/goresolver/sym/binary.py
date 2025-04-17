@@ -198,6 +198,15 @@ class Binary:
             logger.exception("Uncaught exception")
 
     @property
+    def name(self) -> str:
+        """Return the name of the binary.
+
+        Returns:
+            The name of the binary.
+        """
+        return self._path.name
+
+    @property
     def path(self) -> Path:
         """Returns the path to the binary.
 

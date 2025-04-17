@@ -7,7 +7,7 @@ from logging import INFO, Logger, basicConfig, getLogger
 from pathlib import Path
 from typing import Final
 
-from gographer import CompareReport
+from gographer import CompareReport, UnsupportedBinaryFormat
 from pygments import highlight
 from pygments.formatters import TerminalFormatter
 from pygments.lexers.web import JsonLexer
@@ -19,6 +19,7 @@ from .models.cli_arguments import CLIArguments
 from .models.symbol_report import SymbolReport
 from .models.symbol_source import SymbolSource
 from .models.symbol_tree import SymbolTree
+from .sym.binary import Binary
 from .sym.go_sym_parser import GoSymParser
 
 basicConfig()
@@ -46,23 +47,30 @@ def run_cli() -> None:
     symbol_tree: Final[SymbolTree] = SymbolTree()
 
     generator: Final[SampleGenerator] = SampleGenerator(storage_path, display_progress=True)
+    sample_bin: Final[Binary] = Binary(args.sample_path)
+
     if args.show:
         show_versions(generator)
 
     # STEP 1: Extract symbols through similarities
     if args.use_graph:
-        compare_report: CompareReport
+        compare_report: CompareReport | None = None
         if args.compare_report is not None:
             with args.compare_report.open("r") as report_file:
                 compare_report = CompareReport.from_json(report_file.read())
         else:
             go_comparator: Final[GoCompare] = GoCompare(
-                generator, args.sample_path, reference_path=args.reference_path, display_progress=True
+                generator, sample_bin, reference_path=args.reference_path, display_progress=True
             )
-            compare_report = go_comparator.compare(args.go_versions, args.libs)
+
+            try:
+                compare_report = go_comparator.compare(args.go_versions, args.libs)
+            except UnsupportedBinaryFormat as e:
+                logger.error(e)  # noqa: TRY400
+                logger.warning("Skipping similarity analysis ...")
 
         # STEP 1.1: Optionally save the intermediary compare report.
-        if args.backup_path is not None:
+        if args.backup_path is not None and compare_report is not None:
             with args.backup_path.open("w") as backup_file:
                 backup_file.write(compare_report.to_json())
             logger.info(f"Intermediary report written to {args.backup_path}")
@@ -70,14 +78,14 @@ def run_cli() -> None:
     # STEP 2: Extract embeded symbols
     if args.use_extract:
         sym_parser: Final[GoSymParser] = GoSymParser()
-        symbols: Final[dict[int, str]] = sym_parser.extract(args.sample_path)
+        symbols: Final[dict[int, str]] = sym_parser.extract(sample_bin)
 
         # STEP 2.1: Insert symbol in the tree
         for pc, symbol_name in symbols.items():
             symbol_tree.insert(pc, symbol_name, SymbolSource.EXTRACT)
 
     # STEP 3: Cross-Reference with the compare report
-    if args.use_graph:
+    if compare_report is not None:
         for bin_matches in compare_report.matches:
             for method_match in bin_matches.matches:
                 if len(method_match.resolved_name) > 0 and method_match.similarity >= args.threshold:
@@ -87,7 +95,7 @@ def run_cli() -> None:
                         logger.debug(f"{method_match.malware_offset:#0x} - {method_match.resolved_name} : {e}")
 
     # STEP 4: Generate the final JSON report.
-    report_json: Final[str] = SymbolReport(args.sample_path, symbol_tree).to_json(pretty=True)
+    report_json: Final[str] = SymbolReport(sample_bin.path, symbol_tree).to_json(pretty=True)
 
     # STEP 4.1: Print colorized report to the terminal.
     if not args.quiet:
