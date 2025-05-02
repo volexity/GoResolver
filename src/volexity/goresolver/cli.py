@@ -48,13 +48,13 @@ def run_cli() -> None:
 
     generator: Final[SampleGenerator] = SampleGenerator(storage_path, display_progress=True)
     sample_bin: Final[Binary] = Binary(args.sample_path)
+    compare_report: CompareReport | None = None
 
     if args.show:
         show_versions(generator)
 
     # STEP 1: Extract symbols through similarities
     if args.use_graph:
-        compare_report: CompareReport | None = None
         if args.compare_report is not None:
             with args.compare_report.open("r") as report_file:
                 compare_report = CompareReport.from_json(report_file.read())
@@ -82,7 +82,10 @@ def run_cli() -> None:
 
         # STEP 2.1: Insert symbol in the tree
         for pc, symbol_name in symbols.items():
-            symbol_tree.insert(pc, symbol_name, SymbolSource.EXTRACT)
+            try:
+                symbol_tree.insert(pc, symbol_name, SymbolSource.EXTRACT)
+            except ValueError as e:
+                logger.debug(f"{pc:#0x} - {symbol_name} : {e}")
 
     # STEP 3: Cross-Reference with the compare report
     if compare_report is not None:
