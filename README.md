@@ -4,14 +4,31 @@ GoResolver is a Go analysis tool using both Go symbol extraction and Control Flo
 
 This tool supports all three major operating systems, Windows, MacOS and Linux as well as their respective executables formats, PE, ELF and Mach-O for the X86, AMD64, ARM and ARM64 architectures.
 
-## Dependencies
+## How to install
 
-GoResolver depends on the "GoGrapher" and "GoStrap" projects. The latter also depending on "GoProjectManager".
-Please make sure the above dependencies are installed before using GoResolver.
+To install GoResolver, we recommend pulling directly from PyPi :
 
-## Build & Install
+```bash
+pip install goresolver
+```
 
-To build GoResolver use Hatch's usual build command :
+This will install GoResolver as well as its necessary dependencies.
+
+As GoResolver may need differents Go version for its similairty analysis, you will also need to install base Go version (1.20.6 or superior) as a dependency.
+
+See https://go.dev/dl/ to install the right Go version for your device.
+
+### Building from source
+
+If you wish to build & install GoResolver from source instead, please follow the steps below : 
+
+#### Dependencies :
+
+You will need to install base Go version (1.20.6 or superior). See https://go.dev/dl/ to install the right Go version for your device.
+
+#### Build process :
+
+To build GoResolver from source use Hatch's usual build command :
 ```bash
 hatch build
 ```
