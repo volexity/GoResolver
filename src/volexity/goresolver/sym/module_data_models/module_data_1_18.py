@@ -64,7 +64,7 @@ class ModuleData1_18(ModuleData):  # noqa: N801
         _gcdata: Final[int] = reader.read_word()
         _gcbss: Final[int] = reader.read_word()
 
-        _types: Final[int] = reader.read_word()
+        self.types: int = reader.read_word()
         _etypes: Final[int] = reader.read_word()
 
         _rodata: Final[int] = reader.read_word()

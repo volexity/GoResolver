@@ -10,10 +10,11 @@ from .endian import Endian
 class PcLineMagic(IntEnum):
     """Defines the magic numbers relating to each PcLineTable versions."""
 
-    GO_1_2 = 0xFFFFFFFB
-    GO_1_16 = 0xFFFFFFFA
-    GO_1_18 = 0xFFFFFFF0
+    # TODO: Find better way around moduledata version issue
     GO_1_20 = 0xFFFFFFF1
+    GO_1_18 = 0xFFFFFFF0
+    GO_1_16 = 0xFFFFFFFA
+    GO_1_2 = 0xFFFFFFFB
 
     @staticmethod
     def check_table_type(bin_data: bytes, offset: int = 0) -> tuple["PcLineMagic", Endian] | None:

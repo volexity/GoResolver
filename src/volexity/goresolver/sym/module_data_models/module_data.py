@@ -54,6 +54,7 @@ class ModuleData(ABC):
         self.maxpc: int = 0
         self.text: int = 0
         self.etext: int = 0
+        self.types: int = 0
         self.typelinks: Slice = Slice()
         self.modulename: Slice = Slice()  # String
         self.modulehashes: Slice = Slice()
