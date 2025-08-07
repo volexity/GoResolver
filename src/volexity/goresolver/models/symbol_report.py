@@ -11,15 +11,25 @@ from .symbol_tree import SymbolTree, SymbolTreeEncoder
 class SymbolReport:
     """Final Go symbol recovery report of a sample."""
 
-    def __init__(self, sample_path: Path, symbol_tree: SymbolTree) -> None:
+    def __init__(
+        self,
+        sample_path: Path,
+        symbol_tree: SymbolTree,
+        gotypes_address: int | None,
+        type_data: dict | None
+    ) -> None:
         """Initialize a new SymbolReport.
 
         Args:
             sample_path: Path to the sample related to the report.
             symbol_tree: SymbolTree of the symbol from the sample.
+            gotypes_address: Address of Go runtime types
+            type_data: Dictionary of all runtime type information
         """
         self._sample_name: Final[str] = sample_path.name
         self._symbol_tree: Final[SymbolTree] = symbol_tree
+        self._gotypes_address: Final[int | None] = gotypes_address
+        self._type_data: Final[dict | None] = type_data
 
         with sample_path.open("rb") as sample_file:
             sample_data: Final[bytes] = sample_file.read()
@@ -35,7 +45,11 @@ class SymbolReport:
         Returns:
             The dictionary representation of the SymbolReport.
         """
-        return {"Sample": {"Name": self._sample_name, "Hash": self._hash}, "Symbols": self._symbol_tree}
+        return {"Sample": {"Name": self._sample_name, "Hash": self._hash},
+                          "Symbols": self._symbol_tree,
+                          "GoTypes Address": hex(self._gotypes_address)
+                              if self._gotypes_address else None,
+                          "Types": self._type_data}
 
     def to_json(self, pretty: bool = False) -> str:
         """Returns the JSON representation of the SymbolReport.

@@ -43,6 +43,7 @@ class CLIArguments:
         parser.add_argument(
             "-g", "--graph", action="store_true", help="Compare the Go sample against generated references."
         )
+        parser.add_argument("-y", "--types", action="store_true", help="Parse runtime types from the Go sample.")
 
         parsed_args: Final[Namespace] = parser.parse_args(argv[1:])
 
@@ -75,6 +76,8 @@ class CLIArguments:
 
         self._use_extract: Final[bool] = parsed_args.extract or not parsed_args.graph
         self._use_graph: Final[bool] = parsed_args.graph or not parsed_args.extract
+
+        self._parse_types: Final[bool] = parsed_args.types
 
     @property
     def sample_path(self) -> Path:
@@ -168,7 +171,7 @@ class CLIArguments:
 
     @property
     def quiet(self) -> bool:
-        """Returns wether to reduce logging.
+        """Returns whethere to reduce logging.
 
         Returns:
             Whether to reduce logging.
@@ -177,7 +180,7 @@ class CLIArguments:
 
     @property
     def use_extract(self) -> bool:
-        """Returns wether to use the Go symbol extraction algorithm.
+        """Returns whethere to use the Go symbol extraction algorithm.
 
         Returns:
             Whether to use the Go symbol extraction algorithm.
@@ -186,9 +189,19 @@ class CLIArguments:
 
     @property
     def use_graph(self) -> bool:
-        """Returns wether to use the Control Flow Graph comparaison algorithm.
+        """Returns whethere to use the Control Flow Graph comparison algorithm.
 
         Returns:
-            Whether to use the Control Flow Graph comparaison algorithm.
+            Whether to use the Control Flow Graph comparison algorithm.
         """
         return self._use_graph
+
+    @property
+    def parse_types(self) -> bool:
+        """Returns whether to extract runtime type information.
+
+        Returns:
+            Whether to extract runtime type information.
+        """
+        return self._parse_types
+

@@ -1,11 +1,13 @@
 """Implements the GoGrapher-py command line interface."""
 
+import logging
+import multiprocess
 import shutil
 import sys
 from cmd import Cmd
 from logging import INFO, Logger, basicConfig, getLogger
 from pathlib import Path
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from gographer import CompareReport, UnsupportedBinaryFormat
 from pygments import highlight
@@ -21,9 +23,15 @@ from .models.symbol_source import SymbolSource
 from .models.symbol_tree import SymbolTree
 from .sym.binary import Binary
 from .sym.go_sym_parser import GoSymParser
+from .sym.go_type_parser import GoTypeParser
+
+if TYPE_CHECKING:
+    from .sym.module_data_models.module_data import ModuleData
 
 basicConfig()
 getLogger(__name__.rsplit(".", 1)[0]).setLevel(INFO)
+
+logging.getLogger("volexity.gostrap").setLevel(logging.INFO)
 
 logger: Final[Logger] = getLogger(__name__)
 
@@ -42,6 +50,7 @@ def show_versions(generator: SampleGenerator) -> None:
 
 def run_cli() -> None:
     """Implements the GoGrapher-py command line interface."""
+    multiprocess.set_start_method("spawn")
     storage_path: Final[Path] = Path("./storage")
     args: Final[CLIArguments] = CLIArguments(sys.argv)
     symbol_tree: Final[SymbolTree] = SymbolTree()
@@ -66,7 +75,7 @@ def run_cli() -> None:
             try:
                 compare_report = go_comparator.compare(args.go_versions, args.libs)
             except UnsupportedBinaryFormat as e:
-                logger.error(e)  # noqa: TRY400
+                logger.error(e)
                 logger.warning("Skipping similarity analysis ...")
 
         # STEP 1.1: Optionally save the intermediary compare report.
@@ -87,7 +96,20 @@ def run_cli() -> None:
             except ValueError as e:
                 logger.debug(f"{pc:#0x} - {symbol_name} : {e}")
 
-    # STEP 3: Cross-Reference with the compare report
+    # STEP 3: Parse types
+    type_dict: dict | None = None
+    gotypes_address: int | None = None
+    if args.parse_types:
+        moduledata: Final[ModuleData | None] = sym_parser.extract_moduledata(sample_bin)
+
+        if moduledata is not None:
+            type_parser: Final[GoTypeParser] = GoTypeParser(sample_bin, moduledata)
+            type_parser.parse_types()
+
+            type_dict = type_parser.to_dict()
+            gotypes_address = moduledata.types
+
+    # STEP 4: Cross-Reference with the compare report
     if compare_report is not None:
         for bin_matches in compare_report.matches:
             for method_match in bin_matches.matches:
@@ -97,15 +119,17 @@ def run_cli() -> None:
                     except ValueError as e:
                         logger.debug(f"{method_match.malware_offset:#0x} - {method_match.resolved_name} : {e}")
 
-    # STEP 4: Generate the final JSON report.
-    report_json: Final[str] = SymbolReport(sample_bin.path, symbol_tree).to_json(pretty=True)
+    # STEP 5: Generate the final JSON report.
+    report_json: Final[str] = SymbolReport(
+        sample_bin.path, symbol_tree, gotypes_address, type_dict
+    ).to_json(pretty=True)
 
-    # STEP 4.1: Print colorized report to the terminal.
+    # STEP 5.1: Print colorized report to the terminal.
     if not args.quiet:
         report_colorized: Final[str] = highlight(report_json, JsonLexer(), TerminalFormatter())
-        print(f"Report: {report_colorized}")  # noqa: T201
+        print(f"Report: {report_colorized}")
 
-    # STEP 4.2: If required, then write report to disk.
+    # STEP 5.2: If required, then write report to disk.
     if args.output:
         with args.output.open("w") as output_file:
             output_file.write(report_json)

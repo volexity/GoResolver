@@ -41,11 +41,12 @@ class GoSymParser:
         binary: Final[Binary] = sample_bin if isinstance(sample_bin, Binary) else Binary(sample_bin)
         symbols: Final[dict[int, str]] = {}
 
-        if moduledata_table := GoSymParser._extract_moduledata(binary):
+        if moduledata_table := GoSymParser.extract_moduledata(binary):
             logger.info(
                 f"Found valid PcLineTable <-> ModuleData couple at "
                 f"{moduledata_table.pclinetable.offset:#0x} <-> {moduledata_table.offset:#0x}."
             )
+
             pcline_table: PcLineTable = moduledata_table.pclinetable
             for pc, symbol in pcline_table.fct_table.items():
                 symbols[pc] = symbol.name
@@ -53,7 +54,7 @@ class GoSymParser:
         return symbols
 
     @staticmethod
-    def _extract_moduledata(binary: Binary) -> ModuleData | None:
+    def extract_moduledata(binary: Binary) -> ModuleData | None:
         """Attempts to extract the ModuleData from a binary by rearching for a valid ModuleData <-> PcLineTable couple.
 
         Args:

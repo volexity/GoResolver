@@ -20,3 +20,9 @@ dist/
 
 # Vim
 *.sw*
+
+# Scripts
+build.sh
+clean.sh
+
+.DS_Store

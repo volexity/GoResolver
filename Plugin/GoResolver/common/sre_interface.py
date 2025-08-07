@@ -14,6 +14,26 @@ logger: Final[logging.Logger] = logging.getLogger(f"volexity.goresolver_plugin.{
 
 class SREInterface(ABC):
     """SRE base class defining actions to be realised across all SRE tools."""
+    @abstractmethod
+    def initializeGoTypedefs(self, gotypes_address: int) -> dict:
+        """Define all necessary types, enums, and structs for the binary.
+
+        Args:
+            gotypes_address: Address of the Go runtime types used for offsets
+
+        Returns:
+            dict: SRE-specific type class dictionary
+        """
+
+    @abstractmethod
+    def makeType(self, sre_class_dict: dict, address: int, name: str) -> None:
+        """Make the Go runtime type at a specified address.
+
+        Args:
+            sre_class_dict: SRE-specific type class dictionary
+            address: Address of the type to be made
+            name: Name of the type to be made
+        """
 
     @abstractmethod
     def setMethodName(self, method_address: int, method_name: str) -> bool:
@@ -80,12 +100,26 @@ class SREInterface(ABC):
         try:
             report: dict = json.loads(report_data)
             logger.debug(f'Importing report for "{report["Sample"]["Name"]}"')
-
             for entry, symbol in report["Symbols"].items():
                 symbol_name: str = symbol["Name"]
                 address: int = int(entry, 16)
                 old_symbol_name: str = self.getMethodName(address) or ""
                 if self.setMethodName(address, symbol_name):
                     logger.debug(f'Renamed "{old_symbol_name}" to "{symbol_name}" at {address:#0x}')
+
+            # If the GoResolver report extracted types, make them
+            gotypes_address: str | None = report["GoTypes Address"]
+            if gotypes_address:
+                gotypes_address: int = int(gotypes_address, 16)
+
+                # Stash C++ constructor for the Type struct
+                sre_class_dict: dict[str, str] = self.initializeGoTypedefs(
+                    gotypes_address
+                )
+
+                for type_address, type_dict in report["Types"].items():
+                    int_type_address = int(type_address, 16)
+                    self.makeType(sre_class_dict, int_type_address, type_dict)
+
         except json.JSONDecodeError:
             raise ReportDecodeError
