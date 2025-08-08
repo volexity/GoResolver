@@ -16,6 +16,7 @@ class TFlag(Enum):
         TFlagGCMaskOnDemand TFlag = 1 << 4
     )
     """
+
     UNCOMMON = 1 << 0
     EXTRASTAR = 1 << 1
     NAMED = 1 << 2

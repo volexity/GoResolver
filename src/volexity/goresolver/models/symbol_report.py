@@ -12,11 +12,7 @@ class SymbolReport:
     """Final Go symbol recovery report of a sample."""
 
     def __init__(
-        self,
-        sample_path: Path,
-        symbol_tree: SymbolTree,
-        gotypes_address: int | None,
-        type_data: dict | None
+        self, sample_path: Path, symbol_tree: SymbolTree, gotypes_address: int | None, type_data: dict | None
     ) -> None:
         """Initialize a new SymbolReport.
 
@@ -45,11 +41,12 @@ class SymbolReport:
         Returns:
             The dictionary representation of the SymbolReport.
         """
-        return {"Sample": {"Name": self._sample_name, "Hash": self._hash},
-                          "Symbols": self._symbol_tree,
-                          "GoTypes Address": hex(self._gotypes_address)
-                              if self._gotypes_address else None,
-                          "Types": self._type_data}
+        return {
+            "Sample": {"Name": self._sample_name, "Hash": self._hash},
+            "Symbols": self._symbol_tree,
+            "GoTypes Address": hex(self._gotypes_address) if self._gotypes_address else None,
+            "Types": self._type_data,
+        }
 
     def to_json(self, pretty: bool = False) -> str:
         """Returns the JSON representation of the SymbolReport.

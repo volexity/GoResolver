@@ -6,7 +6,7 @@ from typing import Final, override
 
 import ida_idaapi  # type: ignore[import-untyped,import-not-found]
 import ida_name  # type: ignore[import-untyped,import-not-found]
-import ida_typeinf  #type: ignore[import-untyped,import-not-found]
+import ida_typeinf  # type: ignore[import-untyped,import-not-found]
 import idaapi  # type: ignore[import-untyped,import-not-found]
 from common.action_modes import ActionModes
 from common.chan_dirs import ChanDir
@@ -46,13 +46,10 @@ class IDAInterface(SREInterface):
             "unsigned __int32": "uint32",
             "unsigned __int16": "uint16",
             "unsigned __int8": "uint8",
-            "void*": "uintptr"
+            "void*": "uintptr",
         }
         for cpp_type, go_type in typedefs_map.items():
-            ida_typeinf.idc_parse_types(
-                f"typedef {cpp_type} {go_type};",
-                ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL
-            )
+            ida_typeinf.idc_parse_types(f"typedef {cpp_type} {go_type};", ida_typeinf.HTI_PAKDEF | ida_typeinf.HTI_DCL)
 
         # Stash dynamic pointer size after type def for enum width later
         ptrsize: Final[int] = ida_typeinf.calc_type_size(None, bytes("uintptr", "utf-8"))
@@ -70,10 +67,10 @@ class IDAInterface(SREInterface):
         if kind_tif.create_enum(ida_typeinf.BTF_BYTE):
             kind_tif.set_enum_is_bitmask(ida_typeinf.tinfo_t.ENUMBM_ON)
             kind_tif.set_named_type(None, "GOKIND")
-        kind_tif.add_edm("KINDMASK", (1 << 5) - 1) # = 0x1f
+        kind_tif.add_edm("KINDMASK", (1 << 5) - 1)  # = 0x1f
         for kind in Kind:
-            kind_tif.add_edm(kind.name, kind.value, 0x1f)
-        kind_tif.add_edm("DIRECTIFACE", 1 << 5, 0x20) # mask cannot ruin 0x1f
+            kind_tif.add_edm(kind.name, kind.value, 0x1F)
+        kind_tif.add_edm("DIRECTIFACE", 1 << 5, 0x20)  # mask cannot ruin 0x1f
 
         # Create ChanDir enum, FIXME: investigate how to get ptrsize for this
         chandir_tif: tinfo_t = ida_typeinf.tinfo_t()
@@ -165,7 +162,7 @@ class IDAInterface(SREInterface):
                                         uint32 Mtyp __offset(OFF32|NOZEROES, {hex(gotypes_address)});
                                         uint32 Ifn __offset(OFF32|NOZEROES, {hex(gotypes_address)});
                                         uint32 Tfn __offset(OFF32|NOZEROES, {hex(gotypes_address)});
-                                    }}"""
+                                    }}""",
         }
         # Stash necessary C++ tinfo_t class information
         sre_class_dict: dict = {}
@@ -179,12 +176,7 @@ class IDAInterface(SREInterface):
         return sre_class_dict
 
     @override
-    def makeType(
-        self,
-        sre_class_dict: dict,
-        type_address: int,
-        type_dict: dict
-    ) -> None:
+    def makeType(self, sre_class_dict: dict, type_address: int, type_dict: dict) -> None:
         """Make the Go runtime type (and all associated information) at a specified address.
 
         Args:
@@ -200,17 +192,13 @@ class IDAInterface(SREInterface):
         ida_name.set_name(type_str_address, "typestr_" + type_dict["Str"][2:])
 
         # Make the runtime Type struct in the database
-        ida_typeinf.apply_tinfo(
-            type_address, sre_class_dict["GOTYPE"], ida_typeinf.TINFO_DEFINITE
-        )
+        ida_typeinf.apply_tinfo(type_address, sre_class_dict["GOTYPE"], ida_typeinf.TINFO_DEFINITE)
 
         # If the type kind has extra information, write it here:
         type_kind = "GO" + type_dict["Type Information"]["Kind"]
         extra_address = int(type_dict["Type Information"]["Address"], 16)
         if type_kind in sre_class_dict:
-            ida_typeinf.apply_tinfo(
-                extra_address, sre_class_dict[type_kind], ida_typeinf.TINFO_DEFINITE
-            )
+            ida_typeinf.apply_tinfo(extra_address, sre_class_dict[type_kind], ida_typeinf.TINFO_DEFINITE)
 
         # Some types like func, interface, and struct have an extra array
         # of data associated with it. This will write it if need be.
@@ -227,29 +215,16 @@ class IDAInterface(SREInterface):
         if extra_kind is not None:
             for address in type_dict["Type Information"]["Extra"]:
                 array_address = int(address, 16)
-                ida_typeinf.apply_tinfo(
-                    array_address,
-                    sre_class_dict[extra_kind],
-                    ida_typeinf.TINFO_DEFINITE
-                )
+                ida_typeinf.apply_tinfo(array_address, sre_class_dict[extra_kind], ida_typeinf.TINFO_DEFINITE)
 
         # Write uncommon data if it exists
         if type_dict["Uncommon Data"]:
             uncommon_address = int(type_dict["Uncommon Data"]["Address"], 16)
-            ida_typeinf.apply_tinfo(
-                uncommon_address,
-                sre_class_dict["GOUNCOMMON"],
-                ida_typeinf.TINFO_DEFINITE
-            )
+            ida_typeinf.apply_tinfo(uncommon_address, sre_class_dict["GOUNCOMMON"], ida_typeinf.TINFO_DEFINITE)
             # Write any methods associated with the uncommon type
             for address in type_dict["Uncommon Data"]["Methods"]:
                 method_address = int(address, 16)
-                ida_typeinf.apply_tinfo(
-                    method_address,
-                    sre_class_dict["GOUNCOMMONMETHOD"],
-                    ida_typeinf.TINFO_DEFINITE
-                )
-
+                ida_typeinf.apply_tinfo(method_address, sre_class_dict["GOUNCOMMONMETHOD"], ida_typeinf.TINFO_DEFINITE)
 
     @override
     def setMethodName(self, method_address: int, method_name: str) -> bool:
@@ -347,7 +322,7 @@ class GoResolverPlugmod(ida_idaapi.plugmod_t):
             arg: Eventual arguments.
         """
         try:
-            from common.goresolver_plugin import GoResolverPlugin
+            from common.goresolver_plugin import GoResolverPlugin  # noqa: PLC0415
 
             plugin: Final[GoResolverPlugin] = GoResolverPlugin(SRE)
             plugin.start()

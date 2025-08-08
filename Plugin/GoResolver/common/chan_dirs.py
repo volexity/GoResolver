@@ -1,4 +1,5 @@
 """Enumeration of the directions of a Channel type in Go."""
+
 from enum import IntEnum
 
 
@@ -25,7 +26,8 @@ class ChanDir(IntEnum):
         InvalidDir ChanDir = 0
     )
     """
-    RECVDIR = 1 << 0 # <-chan
-    SENDDIR = 1 << 1 # chan<-
-    BOTHDIR = RECVDIR | SENDDIR # chan
+
+    RECVDIR = 1 << 0  # <-chan
+    SENDDIR = 1 << 1  # chan<-
+    BOTHDIR = RECVDIR | SENDDIR  # chan
     INVALIDDIR = 0

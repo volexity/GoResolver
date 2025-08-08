@@ -21,6 +21,7 @@ class Kind(IntEnum):
         KindMask        Kind = (1 << 5) - 1
     )
     """
+
     INVALID = 0
     BOOL = auto()
     INT = auto()

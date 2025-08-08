@@ -14,6 +14,7 @@ logger: Final[logging.Logger] = logging.getLogger(f"volexity.goresolver_plugin.{
 
 class SREInterface(ABC):
     """SRE base class defining actions to be realised across all SRE tools."""
+
     @abstractmethod
     def initializeGoTypedefs(self, gotypes_address: int) -> dict:
         """Define all necessary types, enums, and structs for the binary.
@@ -113,9 +114,7 @@ class SREInterface(ABC):
                 gotypes_address: int = int(gotypes_address, 16)
 
                 # Stash C++ constructor for the Type struct
-                sre_class_dict: dict[str, str] = self.initializeGoTypedefs(
-                    gotypes_address
-                )
+                sre_class_dict: dict[str, str] = self.initializeGoTypedefs(gotypes_address)
 
                 for type_address, type_dict in report["Types"].items():
                     int_type_address = int(type_address, 16)

@@ -22,11 +22,12 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
-  "gographer~=1.1.0",
-  "gostrap~=1.0.1",
+  "gographer~=1.2.0",
+  "gostrap~=1.1.0",
   "pygments~=2.18.0",
   "lief~=0.16.4",
-  "yara-python~=4.5.1"
+  "yara-python~=4.5.1",
+  "multiprocess~=0.70.18"
 ]
 
 [project.scripts]

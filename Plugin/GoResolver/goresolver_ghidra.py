@@ -130,26 +130,20 @@ class GhidraInterface(SREInterface):
                 "Equal": (uintptr_type, ptrsize),
                 "GCData": (uintptr_type, ptrsize),
                 "Str": (uint32_type, -1),
-                "PtrToThis": (uint32_type, -1)
+                "PtrToThis": (uint32_type, -1),
             },
             "GOARRAY": {
                 "Elem": (uintptr_type, ptrsize),
                 "Slice": (uintptr_type, ptrsize),
-                "Len": (uintptr_type, ptrsize)
+                "Len": (uintptr_type, ptrsize),
             },
-            "GOCHAN": {
-                "Elem": (uintptr_type, ptrsize),
-                "Dirs": (chandir_enum, -1)
-            },
-            "GOFUNC": {
-                "InCount": (uint16_type, -1),
-                "OutCount": (uint16_type, -1)
-            },
+            "GOCHAN": {"Elem": (uintptr_type, ptrsize), "Dirs": (chandir_enum, -1)},
+            "GOFUNC": {"InCount": (uint16_type, -1), "OutCount": (uint16_type, -1)},
             "GOINTERFACE": {
                 "PkgPath": (uintptr_type, ptrsize),
                 "IMethods": (uintptr_type, ptrsize),
                 "NumIMethods": (uintptr_type, ptrsize),
-                "NumIMethodsCap": (uintptr_type, ptrsize)
+                "NumIMethodsCap": (uintptr_type, ptrsize),
             },
             "GOMAP": {
                 "Key": (uintptr_type, ptrsize),
@@ -161,29 +155,20 @@ class GhidraInterface(SREInterface):
                 "BucketSize": (uint16_type, -1),
                 "Flags": (uint32_type, -1),
             },
-            "GOPOINTER": {
-                "Elem": (uintptr_type, ptrsize)
-            },
-            "GOSLICE": {
-                "Elem": (uintptr_type, ptrsize)
-            },
+            "GOPOINTER": {"Elem": (uintptr_type, ptrsize)},
+            "GOSLICE": {"Elem": (uintptr_type, ptrsize)},
             "GOSTRUCT": {
                 "PkgPath": (uintptr_type, ptrsize),
                 "Fields": (uintptr_type, ptrsize),
                 "NumFields": (uintptr_type, ptrsize),
-                "NumFieldsCap": (uintptr_type, ptrsize)
+                "NumFieldsCap": (uintptr_type, ptrsize),
             },
-            "GOPARAMETER": {
-                "Offset": (uintptr_type, ptrsize)
-            },
-            "GOIMETHOD": {
-                "Name": (uint32_type, -1),
-                "Typ": (uint32_type, -1)
-            },
+            "GOPARAMETER": {"Offset": (uintptr_type, ptrsize)},
+            "GOIMETHOD": {"Name": (uint32_type, -1), "Typ": (uint32_type, -1)},
             "GOSTRUCTFIELD": {
                 "Name": (uintptr_type, ptrsize),
                 "Typ": (uintptr_type, ptrsize),
-                "Offset": (uintptr_type, ptrsize)
+                "Offset": (uintptr_type, ptrsize),
             },
             "GOUNCOMMON": {
                 "Name": (uint32_type, -1),
@@ -197,11 +182,11 @@ class GhidraInterface(SREInterface):
                 "Mtyp": (uint32_type, -1),
                 "Ifn": (uint32_type, -1),
                 "Tfn": (uint32_type, -1),
-            }
+            },
         }
         # Stash necessary Java class info
         sre_class_dict: dict[str, DataType] = {
-            "uintptr": uintptr_type # to recover ptrsize
+            "uintptr": uintptr_type  # to recover ptrsize
         }
         # Make each of the structs in the Ghidra DB
         for struct_name, struct_fields in ghidra_struct_dict.items():
@@ -213,14 +198,8 @@ class GhidraInterface(SREInterface):
 
         return sre_class_dict
 
-
     @override
-    def makeType(
-        self,
-        sre_class_dict: dict,
-        type_address: int,
-        type_dict: dict
-    ) -> None:
+    def makeType(self, sre_class_dict: dict, type_address: int, type_dict: dict) -> None:
         """Make the Go runtime type (and all associated information) at a specified address.
 
         Args:
@@ -228,13 +207,8 @@ class GhidraInterface(SREInterface):
             type_address: Address of the type to be made
             type_dict: Dictionary associated with all the type information
         """
-        allowed_chars_set: set(chr) = set(
-            "_0123456789abcdefghijklmnopqrstuvwxyz"
-            "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        )
-        filtered_name: str = "".join([
-            c if c in allowed_chars_set else "_" for c in type_dict["Name"]
-        ])
+        allowed_chars_set: set(chr) = set("_0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+        filtered_name: str = "".join([c if c in allowed_chars_set else "_" for c in type_dict["Name"]])
 
         # Class to make all data in the Ghidra database
         flat_program_api: Final[FlatProgramAPI] = FlatProgramAPI(currentProgram)
@@ -242,25 +216,21 @@ class GhidraInterface(SREInterface):
 
         # Set type name in database to GOTYPE_<type string>
         address: Final[Address] = address_factory.getAddress(hex(type_address))
-        flat_program_api.createLabel(address, filtered_name, True) # noqa: FBT003
+        flat_program_api.createLabel(address, filtered_name, True)  # noqa: FBT003
 
         # Rename type string address for readability
         type_str_address: Final[Address] = address_factory.getAddress(type_dict["Str"])
         flat_program_api.createLabel(
-            type_str_address, "typestr_" + type_dict["Str"][2:], True  # noqa: FBT003
+            type_str_address,
+            "typestr_" + type_dict["Str"][2:],
+            True,  # noqa: FBT003
         )
         # Also make the Str field clickable, instead of a 32-bit offset
         ptrsize: Final[int] = sre_class_dict["uintptr"].getLength()
         reference_manager: Final[ReferenceManager] = currentProgram.getReferenceManager()
-        str_field_address: Final[Address] = address_factory.getAddress(
-            hex(type_address + 8 + 4 * ptrsize)
-        )
+        str_field_address: Final[Address] = address_factory.getAddress(hex(type_address + 8 + 4 * ptrsize))
         reference_manager.addMemoryReference(
-            str_field_address,
-            type_str_address,
-            RefType.DATA,
-            SourceType.USER_DEFINED,
-            0
+            str_field_address, type_str_address, RefType.DATA, SourceType.USER_DEFINED, 0
         )
 
         # Make the runtime Type struct in the database
@@ -269,9 +239,7 @@ class GhidraInterface(SREInterface):
 
         # If the type kind has extra information, write it here:
         type_kind: Final[str] = "GO" + type_dict["Type Information"]["Kind"]
-        extra_address: Final[Address] = address_factory.getAddress(
-            type_dict["Type Information"]["Address"]
-        )
+        extra_address: Final[Address] = address_factory.getAddress(type_dict["Type Information"]["Address"])
         if type_kind in sre_class_dict:
             self.cleanData(extra_address, sre_class_dict[type_kind])
             flat_program_api.createData(extra_address, sre_class_dict[type_kind])
@@ -292,26 +260,18 @@ class GhidraInterface(SREInterface):
             for address in type_dict["Type Information"]["Extra"]:
                 array_address: Final[Address] = address_factory.getAddress(address)
                 self.cleanData(array_address, sre_class_dict[extra_kind])
-                flat_program_api.createData(
-                    array_address, sre_class_dict[extra_kind]
-                )
+                flat_program_api.createData(array_address, sre_class_dict[extra_kind])
 
         # Write uncommon data if it exists
         if type_dict["Uncommon Data"]:
-            uncommon_address: Final[Address] = address_factory.getAddress(
-                type_dict["Uncommon Data"]["Address"]
-            )
+            uncommon_address: Final[Address] = address_factory.getAddress(type_dict["Uncommon Data"]["Address"])
             self.cleanData(uncommon_address, sre_class_dict["GOUNCOMMON"])
-            flat_program_api.createData(
-                uncommon_address, sre_class_dict["GOUNCOMMON"]
-            )
+            flat_program_api.createData(uncommon_address, sre_class_dict["GOUNCOMMON"])
             # Write any methods associated with the uncommon type
             for address in type_dict["Uncommon Data"]["Methods"]:
                 method_address: Final[Address] = address_factory.getAddress(address)
                 self.cleanData(method_address, sre_class_dict["GOUNCOMMONMETHOD"])
-                flat_program_api.createData(
-                    method_address, sre_class_dict["GOUNCOMMONMETHOD"]
-                )
+                flat_program_api.createData(method_address, sre_class_dict["GOUNCOMMONMETHOD"])
 
     def cleanData(self, address: Address, data_type: DataType) -> None:
         """Remove any data defined by Ghidra in the types area.
@@ -329,7 +289,7 @@ class GhidraInterface(SREInterface):
             if flat_program_api.getDataAt(new_address) is not None:
                 try:
                     flat_program_api.removeDataAt(new_address)
-                except Exception: # noqa: BLE001
+                except Exception:  # noqa: BLE001
                     logger.error("Error cleaning data for types.")
 
     def getPath(self, title: str, button_text: str, *, default: Path | None = None) -> Path:
@@ -485,7 +445,7 @@ if not any(map(lambda h: isinstance(h, HANDLER.__class__), volexity_logger.handl
 def entry() -> None:
     """The entrypoint of the Ghidra plugin."""
     try:
-        from common.goresolver_plugin import GoResolverPlugin
+        from common.goresolver_plugin import GoResolverPlugin  # noqa: PLC0415
 
         plugin: Final[GoResolverPlugin] = GoResolverPlugin(SRE)
         plugin.start()

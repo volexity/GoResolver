@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
 logger: Final[logging.Logger] = logging.getLogger(__name__)
 
+
 class GoTypeParser:
     """Type parsing class."""
 
@@ -42,14 +43,9 @@ class GoTypeParser:
         # Separate readers to walk each typelink offset and any associated
         # data or types (helps prevent overwriting global state of readers)
         self._typelink_reader: Final[BinaryReader] = BinaryReader(
-            binary,
-            binary.arch,
-            binary.get_offset_from_address(self._typelinks.data_address)
+            binary, binary.arch, binary.get_offset_from_address(self._typelinks.data_address)
         )
-        self._reader: Final[BinaryReader] = BinaryReader(
-            binary,
-            binary.arch
-        )
+        self._reader: Final[BinaryReader] = BinaryReader(binary, binary.arch)
 
     def to_dict(self) -> dict:
         """Returns the dictionary of all the runtime type information.
@@ -99,9 +95,7 @@ class GoTypeParser:
         self._parsed.add(address)
 
         # +----------------- 0 -----------------+
-        rtype: dict[str, int] = self._parse_common_type(
-            self._binary.get_offset_from_address(address)
-        )
+        rtype: dict[str, int] = self._parse_common_type(self._binary.get_offset_from_address(address))
 
         # +----------------- A -----------------+ (also parses C)
         type_info: dict = {}
@@ -109,17 +103,13 @@ class GoTypeParser:
         type_info["Kind"] = Kind(kind).name
         extra_address: int = self._reader.offset
 
-        flags: Final[list[TFlag]] = [
-            tf for tf in TFlag if rtype["_tflag"] & tf.value == tf.value
-        ]
+        flags: Final[list[TFlag]] = [tf for tf in TFlag if rtype["_tflag"] & tf.value == tf.value]
         uncommon: Final[bool] = TFlag.UNCOMMON in flags
         if uncommon:
             uncommon_offset: Final[int] = self._reader.offset
             extra_address += 16
 
-        type_info["Address"] = hex(
-            self._binary.get_address_from_offset(extra_address)
-        )
+        type_info["Address"] = hex(self._binary.get_address_from_offset(extra_address))
         type_info["Extra"] = None
 
         # Not all types are included in typelinks, the rest are discovered
@@ -152,13 +142,13 @@ class GoTypeParser:
         # '*' prepended to type name by default, strip if it isn't a pointer
         type_name: str = self._read_name(self._types + rtype["_str"] + 1)[1:]
         if TFlag.EXTRASTAR not in flags:
-            type_name = "ptr_" + type_name # SRE typenames cannot contain '*'
+            type_name = "ptr_" + type_name  # SRE typenames cannot contain '*'
 
         self._output[hex(address)] = {
             "Name": "GOTYPE_" + type_name + "_" + hex(address),
             "Str": hex(rtype["_str"] + self._types),
             "Type Information": type_info,
-            "Uncommon Data": uncommon_data
+            "Uncommon Data": uncommon_data,
         }
 
     def _parse_common_type(self, offset: int) -> dict[str, int]:
@@ -213,9 +203,7 @@ class GoTypeParser:
 
         # See go/src/internal/abi/type.go for Method definition.
         for _i in range(_mcount):
-            method_addrs.append(
-                self._binary.get_address_from_offset(self._reader.offset)
-            )
+            method_addrs.append(self._binary.get_address_from_offset(self._reader.offset))
             _name: int = self._reader.read_int(4)
             _mtyp: int = self._reader.read_int(4)
             _ifn: int = self._reader.read_int(4)
@@ -258,7 +246,7 @@ class GoTypeParser:
         _in_count: Final[int] = self._reader.read_int(2)
         # MSB in _out_count is set to 1 if the function is variadic,
         # this clears the variadic bit
-        _out_count: Final[int] = self._reader.read_int(2) & 0x7fff
+        _out_count: Final[int] = self._reader.read_int(2) & 0x7FFF
 
         # Fix byte alignment for 64-bit systems
         if self._binary.arch in (Arch.AMD64, Arch.ARM64):
@@ -273,9 +261,7 @@ class GoTypeParser:
         param_type_addrs: list[int] = []
 
         for _i in range(_in_count + _out_count):
-            param_info.append(self._binary.get_address_from_offset(
-                self._reader.offset
-            ))
+            param_info.append(self._binary.get_address_from_offset(self._reader.offset))
             _param_type: int = self._reader.read_word()
             param_type_addrs.append(_param_type)
 
@@ -306,9 +292,7 @@ class GoTypeParser:
         imethod_info: list[int] = []
         imethod_type_offsets: list[int] = []
         for _i in range(_num_imethods):
-            imethod_info.append(self._binary.get_address_from_offset(
-                self._reader.offset
-            ))
+            imethod_info.append(self._binary.get_address_from_offset(self._reader.offset))
             _name: int = self._reader.read_int(4)
             _type: int = self._reader.read_int(4)
             imethod_type_offsets.append(_type)
@@ -367,9 +351,7 @@ class GoTypeParser:
             self._reader.offset += 16
 
         for _i in range(_num_fields):
-            field_info.append(self._binary.get_address_from_offset(
-                self._reader.offset
-            ))
+            field_info.append(self._binary.get_address_from_offset(self._reader.offset))
             _name: int = self._reader.read_word()
             _typ: int = self._reader.read_word()
             _offset: int = self._reader.read_word()
@@ -420,8 +402,8 @@ class GoTypeParser:
         for i, byte in enumerate(buffer):
             if byte < 0x80:  # noqa: PLR2004
                 if i > 9 or (i == 9 and byte > 1):  # noqa: PLR2004
-                    return "" # error with string encoding
-                str_len |= (byte << shift)
+                    return ""  # error with string encoding
+                str_len |= byte << shift
                 len_len = i + 1
                 break
             str_len |= (byte & 0x7F) << shift
@@ -429,9 +411,7 @@ class GoTypeParser:
 
         # Update offset to the start of the string, then collect the chars
         self._reader.offset = self._binary.get_offset_from_address(address + len_len)
-        chr_list: list[int] = [
-            self._reader.read_int(1) for i in range(str_len)
-        ]
+        chr_list: list[int] = [self._reader.read_int(1) for i in range(str_len)]
         str_res: Final[str] = "".join(chr(i) for i in chr_list)
 
         # Cache the string

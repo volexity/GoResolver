@@ -204,4 +204,3 @@ class CLIArguments:
             Whether to extract runtime type information.
         """
         return self._parse_types
-

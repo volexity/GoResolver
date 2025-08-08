@@ -1,7 +1,6 @@
 """Implements the GoGrapher-py command line interface."""
 
 import logging
-import multiprocess
 import shutil
 import sys
 from cmd import Cmd
@@ -9,6 +8,7 @@ from logging import INFO, Logger, basicConfig, getLogger
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
+import multiprocess  # type: ignore[import-untyped]
 from gographer import CompareReport, UnsupportedBinaryFormat
 from pygments import highlight
 from pygments.formatters import TerminalFormatter
@@ -48,7 +48,7 @@ def show_versions(generator: SampleGenerator) -> None:
     sys.exit()
 
 
-def run_cli() -> None:
+def run_cli() -> None:  # noqa: PLR0915
     """Implements the GoGrapher-py command line interface."""
     multiprocess.set_start_method("spawn")
     storage_path: Final[Path] = Path("./storage")
@@ -75,7 +75,7 @@ def run_cli() -> None:
             try:
                 compare_report = go_comparator.compare(args.go_versions, args.libs)
             except UnsupportedBinaryFormat as e:
-                logger.error(e)
+                logger.error(e)  # noqa: TRY400
                 logger.warning("Skipping similarity analysis ...")
 
         # STEP 1.1: Optionally save the intermediary compare report.
@@ -120,14 +120,14 @@ def run_cli() -> None:
                         logger.debug(f"{method_match.malware_offset:#0x} - {method_match.resolved_name} : {e}")
 
     # STEP 5: Generate the final JSON report.
-    report_json: Final[str] = SymbolReport(
-        sample_bin.path, symbol_tree, gotypes_address, type_dict
-    ).to_json(pretty=True)
+    report_json: Final[str] = SymbolReport(sample_bin.path, symbol_tree, gotypes_address, type_dict).to_json(
+        pretty=True
+    )
 
     # STEP 5.1: Print colorized report to the terminal.
     if not args.quiet:
         report_colorized: Final[str] = highlight(report_json, JsonLexer(), TerminalFormatter())
-        print(f"Report: {report_colorized}")
+        print(f"Report: {report_colorized}")  # noqa: T201
 
     # STEP 5.2: If required, then write report to disk.
     if args.output:
