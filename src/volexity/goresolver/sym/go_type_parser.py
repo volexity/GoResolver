@@ -105,8 +105,8 @@ class GoTypeParser:
 
         flags: Final[list[TFlag]] = [tf for tf in TFlag if rtype["_tflag"] & tf.value == tf.value]
         uncommon: Final[bool] = TFlag.UNCOMMON in flags
+        uncommon_offset: int = self._reader.offset
         if uncommon:
-            uncommon_offset: Final[int] = self._reader.offset
             extra_address += 16
 
         type_info["Address"] = hex(self._binary.get_address_from_offset(extra_address))
@@ -116,21 +116,21 @@ class GoTypeParser:
         # recursively inside the fields of these types
         match kind:
             case Kind.ARRAY:
-                self._parse_array_type()
+                uncommon_offset = self._parse_array_type()
             case Kind.CHAN:
-                self._parse_chan_type()
+                uncommon_offset = self._parse_chan_type()
             case Kind.FUNC:
-                type_info["Extra"] = self._parse_func_type(uncommon)
+                uncommon_offset, type_info["Extra"] = self._parse_func_type(uncommon)
             case Kind.INTERFACE:
-                type_info["Extra"] = self._parse_interface_type(uncommon)
+                uncommon_offset, type_info["Extra"] = self._parse_interface_type(uncommon)
             case Kind.MAP:
-                self._parse_map_type()
+                uncommon_offset = self._parse_map_type()
             case Kind.POINTER:
-                self._parse_pointer_type()
+                uncommon_offset = self._parse_pointer_type()
             case Kind.SLICE:
-                self._parse_slice_type()
+                uncommon_offset = self._parse_slice_type()
             case Kind.STRUCT:
-                type_info["Extra"] = self._parse_struct_type(uncommon)
+                uncommon_offset, type_info["Extra"] = self._parse_struct_type(uncommon)
             case _:
                 pass
 
@@ -218,30 +218,47 @@ class GoTypeParser:
         # for method_type_offset in method_type_offsets:
         #     self._parse_type(self._types + method_type_offset)
 
-    def _parse_array_type(self) -> None:
-        """Parse array type and recursively parse its fields."""
+    def _parse_array_type(self) -> int:
+        """Parse array type and recursively parse its fields.
+
+        Returns:
+            int: The offset for the Uncommon Type struct
+        """
         _elem: Final[int] = self._reader.read_word()
         _slice: Final[int] = self._reader.read_word()
         _len: Final[int] = self._reader.read_word()
 
+        uncommon_offset = self._reader.offset
+
         self._parse_type(_elem)
         self._parse_type(_slice)
 
-    def _parse_chan_type(self) -> None:
-        """Parse channel type and recursively parse its fields."""
+        return uncommon_offset
+
+    def _parse_chan_type(self) -> int:
+        """Parse channel type and recursively parse its fields.
+
+        Returns:
+            int: The offset for the Uncommon Type struct
+        """
         _elem: Final[int] = self._reader.read_word()
         _dirs: Final[int] = self._reader.read_word()
 
+        uncommon_offset = self._reader.offset
+
         self._parse_type(_elem)
 
-    def _parse_func_type(self, uncommon: bool) -> list[str]:
+        return uncommon_offset
+
+    def _parse_func_type(self, uncommon: bool) -> tuple[int, list[str]]:
         """Parse function type and recursively parse its fields.
 
         Args:
             uncommon (bool): Whether this type has uncommon data.
 
         Returns:
-            list[str]: Hexadecimal addresses of the func's parameter types.
+            tuple[int, list[str]]: The offset for the Uncommon Type struct and
+            hexadecimal addresses of the func's parameter types.
         """
         _in_count: Final[int] = self._reader.read_int(2)
         # MSB in _out_count is set to 1 if the function is variadic,
@@ -253,6 +270,7 @@ class GoTypeParser:
             self._reader.read_int(4)
 
         # Uncommon data is inserted between type and type array, skip it
+        uncommon_offset = self._reader.offset
         if uncommon:
             self._reader.offset += 16
 
@@ -268,16 +286,17 @@ class GoTypeParser:
         for param_type_addr in param_type_addrs:
             self._parse_type(param_type_addr)
 
-        return list(map(hex, param_info))
+        return uncommon_offset, list(map(hex, param_info))
 
-    def _parse_interface_type(self, uncommon: bool) -> list[str]:
+    def _parse_interface_type(self, uncommon: bool) -> tuple[int, list[str]]:
         """Parse interface type and recursively parse its fields.
 
         Args:
             uncommon (bool): Whether this type has uncommon data.
 
         Returns:
-            list[str]: Hexadecimal addresses of the interface's method types.
+            tuple[int, list[str]]: The offset for the Uncommon Type struct and
+            hexadecimal addresses of the func's parameter types.
         """
         _pkg_path: Final[int] = self._reader.read_word()
         _imethods_ptr: Final[int] = self._reader.read_word()
@@ -285,6 +304,7 @@ class GoTypeParser:
         _num_imethods_cap: Final[int] = self._reader.read_word()
 
         # Uncommon data is inserted between type and type array, skip it
+        uncommon_offset = self._reader.offset
         if uncommon:
             self._reader.offset += 16
 
@@ -300,10 +320,14 @@ class GoTypeParser:
         for imethod_type_offset in imethod_type_offsets:
             self._parse_type(self._types + imethod_type_offset)
 
-        return list(map(hex, imethod_info))
+        return uncommon_offset, list(map(hex, imethod_info))
 
-    def _parse_map_type(self) -> None:
-        """Parse map type and recursively parse its fields."""
+    def _parse_map_type(self) -> int:
+        """Parse map type and recursively parse its fields.
+
+        Returns:
+            int: The offset for the Uncommon Type struct
+        """
         # New SwissMap is still in experimental mode, lookout for
         # the update in Go1.25 (go/src/cmd/compile/internal/reflectdata)
         _key: Final[int] = self._reader.read_word()
@@ -315,27 +339,50 @@ class GoTypeParser:
         _bucket_size: Final[int] = self._reader.read_word(2)
         _flags: Final[int] = self._reader.read_word(4)
 
+        uncommon_offset = self._reader.offset
+
         self._parse_type(_key)
         self._parse_type(_elem)
         self._parse_type(_bucket)
 
-    def _parse_pointer_type(self) -> None:
-        """Parse pointer type and recursively parse its fields."""
+        return uncommon_offset
+
+    def _parse_pointer_type(self) -> int:
+        """Parse pointer type and recursively parse its fields.
+
+        Returns:
+            int: The offset for the Uncommon Type struct
+        """
         _elem: Final[int] = self._reader.read_word()
+
+        uncommon_offset = self._reader.offset
+
         self._parse_type(_elem)
 
-    def _parse_slice_type(self) -> None:
-        """Parse slice type and recursively parse its fields."""
+        return uncommon_offset
+
+    def _parse_slice_type(self) -> int:
+        """Parse slice type and recursively parse its fields.
+
+        Returns:
+            int: The offset for the Uncommon Type struct
+        """
         _elem: Final[int] = self._reader.read_word()
+
+        uncommon_offset = self._reader.offset
+
         self._parse_type(_elem)
 
-    def _parse_struct_type(self, uncommon: bool) -> list[str]:
+        return uncommon_offset
+
+    def _parse_struct_type(self, uncommon: bool) -> tuple[int, list[str]]:
         """Parse struct type and recursively parse its fields.
 
         Args: uncommon (bool): Whether this type has uncommon data.
 
         Returns:
-            list[str]: Hexadecimal addresses of the struct's field types.
+            tuple[int, list[str]]: The offset for the Uncommon Type struct and
+            hexadecimal addresses of the func's parameter types.
         """
         _pkg_path: Final[int] = self._reader.read_word()
         _fields_ptr: Final[int] = self._reader.read_word()
@@ -347,6 +394,7 @@ class GoTypeParser:
         field_type_addrs: list[int] = []
 
         # Uncommon data is inserted between type and type array, skip it
+        uncommon_offset = self._reader.offset
         if uncommon:
             self._reader.offset += 16
 
@@ -360,7 +408,7 @@ class GoTypeParser:
         for field_type_addr in field_type_addrs:
             self._parse_type(field_type_addr)
 
-        return list(map(hex, field_info))
+        return uncommon_offset, list(map(hex, field_info))
 
     def _read_name(self, address: int) -> str:
         """Read type name at a given address (length may be encoded).
