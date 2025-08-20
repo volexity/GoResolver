@@ -23,7 +23,7 @@ classifiers = [
 ]
 dependencies = [
   "gographer~=1.2.0",
-  "gostrap~=1.1.0",
+  "gostrap~=1.1.1",
   "pygments~=2.18.0",
   "lief~=0.16.4",
   "yara-python~=4.5.1",
@@ -69,7 +69,6 @@ packages = ["src/volexity"]
 [tool.hatch.envs.default]
 extra-dependencies = [
   "mypy~=1.13",
-
   "types-pygments",
 ]
 

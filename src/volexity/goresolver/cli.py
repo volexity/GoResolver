@@ -1,5 +1,6 @@
 """Implements the GoGrapher-py command line interface."""
 
+import contextlib
 import logging
 import shutil
 import sys
@@ -10,9 +11,9 @@ from typing import TYPE_CHECKING, Final
 
 import multiprocess  # type: ignore[import-untyped]
 from gographer import CompareReport, UnsupportedBinaryFormat
-from pygments import highlight
+from pygments import highlight  # type: ignore[reportUnknownVariableType]
 from pygments.formatters import TerminalFormatter
-from pygments.lexers.web import JsonLexer
+from pygments.lexers.web import JsonLexer  # type: ignore[reportMissingTypeStubs]
 
 from volexity.gostrap.sample_generator import SampleGenerator
 
@@ -27,6 +28,10 @@ from .sym.go_type_parser import GoTypeParser
 
 if TYPE_CHECKING:
     from .sym.module_data_models.module_data import ModuleData
+
+# Spawns fresh interpreter, avoids issues with fork() from global thread
+with contextlib.suppress(RuntimeError):
+    multiprocess.set_start_method("spawn")
 
 basicConfig()
 getLogger(__name__.rsplit(".", 1)[0]).setLevel(INFO)
@@ -50,7 +55,6 @@ def show_versions(generator: SampleGenerator) -> None:
 
 def run_cli() -> None:  # noqa: PLR0915
     """Implements the GoGrapher-py command line interface."""
-    multiprocess.set_start_method("spawn")
     storage_path: Final[Path] = Path("./storage")
     args: Final[CLIArguments] = CLIArguments(sys.argv)
     symbol_tree: Final[SymbolTree] = SymbolTree()
