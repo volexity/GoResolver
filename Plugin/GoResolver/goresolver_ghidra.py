@@ -2,7 +2,7 @@
 # GoGrapher
 ##
 # GoGrapher plugin for Ghidra
-# @category: Examples.Python
+# @category: Analysis.Python
 # @runtime PyGhidra
 
 
@@ -12,7 +12,9 @@ from typing import TYPE_CHECKING, Final, override
 
 from common.action_modes import ActionModes
 from common.chan_dirs import ChanDir
+from common.goresolver_interface import GoResolverInterface
 from common.plugin_exceptions import UserCancellationError
+from common.sre_action import SREAction
 from common.sre_interface import SREInterface
 from common.type_flag import TFlag
 from common.type_kind import Kind
@@ -39,7 +41,9 @@ from java.util import ArrayList  # type: ignore
 if TYPE_CHECKING:
     from ghidra.ghidra_builtins import (  # type: ignore
         askChoice,
+        askChoices,
         askFile,
+        askYesNo,
         currentProgram,
         getFunctionAt,
         print,
@@ -207,7 +211,7 @@ class GhidraInterface(SREInterface):
             type_address: Address of the type to be made
             type_dict: Dictionary associated with all the type information
         """
-        allowed_chars_set: set(chr) = set("_0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+        allowed_chars_set: set[chr] = set("_0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
         filtered_name: str = "".join([c if c in allowed_chars_set else "_" for c in type_dict["Name"]])
 
         # Class to make all data in the Ghidra database
@@ -234,14 +238,14 @@ class GhidraInterface(SREInterface):
         )
 
         # Make the runtime Type struct in the database
-        self.cleanData(address, sre_class_dict["GOTYPE"])
+        GhidraInterface._cleanData(address, sre_class_dict["GOTYPE"])
         flat_program_api.createData(address, sre_class_dict["GOTYPE"])
 
         # If the type kind has extra information, write it here:
         type_kind: Final[str] = "GO" + type_dict["Type Information"]["Kind"]
         extra_address: Final[Address] = address_factory.getAddress(type_dict["Type Information"]["Address"])
         if type_kind in sre_class_dict:
-            self.cleanData(extra_address, sre_class_dict[type_kind])
+            GhidraInterface._cleanData(extra_address, sre_class_dict[type_kind])
             flat_program_api.createData(extra_address, sre_class_dict[type_kind])
 
         # Some types like func, interface, and struct have an extra array
@@ -259,21 +263,22 @@ class GhidraInterface(SREInterface):
         if extra_kind is not None:
             for address in type_dict["Type Information"]["Extra"]:
                 array_address: Final[Address] = address_factory.getAddress(address)
-                self.cleanData(array_address, sre_class_dict[extra_kind])
+                GhidraInterface._cleanData(array_address, sre_class_dict[extra_kind])
                 flat_program_api.createData(array_address, sre_class_dict[extra_kind])
 
         # Write uncommon data if it exists
         if type_dict["Uncommon Data"]:
             uncommon_address: Final[Address] = address_factory.getAddress(type_dict["Uncommon Data"]["Address"])
-            self.cleanData(uncommon_address, sre_class_dict["GOUNCOMMON"])
+            GhidraInterface._cleanData(uncommon_address, sre_class_dict["GOUNCOMMON"])
             flat_program_api.createData(uncommon_address, sre_class_dict["GOUNCOMMON"])
             # Write any methods associated with the uncommon type
             for address in type_dict["Uncommon Data"]["Methods"]:
                 method_address: Final[Address] = address_factory.getAddress(address)
-                self.cleanData(method_address, sre_class_dict["GOUNCOMMONMETHOD"])
+                GhidraInterface._cleanData(method_address, sre_class_dict["GOUNCOMMONMETHOD"])
                 flat_program_api.createData(method_address, sre_class_dict["GOUNCOMMONMETHOD"])
 
-    def cleanData(self, address: Address, data_type: DataType) -> None:
+    @staticmethod
+    def _cleanData(address: Address, data_type: DataType) -> None:
         """Remove any data defined by Ghidra in the types area.
 
         Args:
@@ -292,7 +297,8 @@ class GhidraInterface(SREInterface):
                 except Exception:  # noqa: BLE001
                     logger.error("Error cleaning data for types.")
 
-    def getPath(self, title: str, button_text: str, *, default: Path | None = None) -> Path:
+    @staticmethod
+    def _getPath(title: str, button_text: str, *, default: Path | None = None) -> Path:
         """Prompt the user to open a file.
 
         Args:
@@ -316,7 +322,8 @@ class GhidraInterface(SREInterface):
             return default
         raise UserCancellationError
 
-    def getMode(self, restrict: list[ActionModes] | None = None) -> ActionModes:
+    @staticmethod
+    def _getMode(restrict: list[ActionModes] | None = None) -> ActionModes:
         """Prompt the user for the mode of operation.
 
         Args:
@@ -343,6 +350,24 @@ class GhidraInterface(SREInterface):
             pass
 
         raise UserCancellationError
+
+    def _getGoVersion(self) -> list[str]:
+        """Prompts the user to select one or multiple Go versions amongst the ones currently installed.
+
+        Returns:
+            The list of Go versions selected by the user.
+        """
+        installed_versions: list[str] = GoResolverInterface.get_installed_go_versions()
+        if not installed_versions:
+            msg: str = "Please install a go version using the CLI first."
+            self.showDialog("ERROR", msg)
+            raise UserCancellationError(msg)
+        selected_versions: ArrayList[String] = askChoices(
+            String("GoVersion selection"),
+            String("Select the Go version to use for analysis"),
+            ArrayList([String(ver) for ver in installed_versions]),
+        )
+        return [str(ver) for ver in selected_versions]
 
     @override
     def setMethodName(self, method_address: int, method_name: str) -> bool:
@@ -401,7 +426,7 @@ class GhidraInterface(SREInterface):
         return (Path.home() / ".ghidra").resolve()
 
     @override
-    def getAction(self, restrict: list[ActionModes] | None = None) -> tuple[ActionModes, Path | None]:
+    def getAction(self, restrict: list[ActionModes] | None = None) -> SREAction:
         """Prompt the user for the action mode and report path.
 
         Args:
@@ -409,19 +434,33 @@ class GhidraInterface(SREInterface):
 
         Returns: Action mode and report path.
         """
-        mode: Final[ActionModes] = self.getMode(restrict)
+        mode: Final[ActionModes] = GhidraInterface._getMode(restrict)
         report_path: Path | None = None
+        selected_versions: list[str] = []
 
         match mode:
             case ActionModes.ANALYZE:
-                try:
-                    report_path = self.getPath("GoGrapher report save path", "Save")
-                except UserCancellationError:
-                    pass
+                report_path = GhidraInterface._getPath("GoGrapher report save path", "Save")
+                while True:
+                    selected_versions = self._getGoVersion()
+                    if selected_versions:
+                        break
+                    self.showDialog("ERROR", "Please select a go version")
+                    print("Please select a go version")
             case ActionModes.IMPORT:
-                report_path = self.getPath("Import GoGrapher report", "Import")
+                report_path = GhidraInterface._getPath("Import GoGrapher report", "Import")
 
-        return (mode, report_path)
+        return SREAction(mode, report_path, selected_versions)
+
+    @override
+    def showDialog(self, title: str, message: str) -> None:
+        """Display a dialog to the user with the provided title and message.
+
+        Args:
+            title: The title of the dialog window.
+            message: The message content of the dialog window.
+        """
+        askYesNo(title, message)
 
     @override
     def print(self, string: str) -> None:

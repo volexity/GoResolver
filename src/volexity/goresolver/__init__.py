@@ -1,1 +1,1 @@
-"""."""
+"""GoResolver module."""

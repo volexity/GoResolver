@@ -37,7 +37,14 @@ class PcLineMagic(IntEnum):
 
     @staticmethod
     def from_version(version: GOVersion) -> "PcLineMagic":
-        """."""
+        """Parse the Go version to its PcLineMagic version.
+
+        Args:
+            version: Go version to be parsed.
+
+        Returns:
+            The corresponding PcLineMagic version.
+        """
         if version >= GOVersion("go1.20"):
             return PcLineMagic.GO_1_20
         if version >= GOVersion("go1.18"):

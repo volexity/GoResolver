@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Final
 
 from gographer import CompareReport, Disassembly, Grapher
-
 from volexity.gostrap.sample_generator import ArchTypes, PlatformTypes, SampleGenerator
 
 from .buildinfo.go_buildinfo_parser import BuildInfo
@@ -126,7 +125,7 @@ class GoCompare:
             return 0.0
 
     def __generate_graphs(self, reference_samples: list[tuple[str, Path]]) -> list[Disassembly]:
-        """."""
+        """Generate the control flow graph of the provided samples."""
         if not self.__sample_disassembly:
             reference_samples.append((self.__sample_bin.name, self.__sample_bin.path))
 

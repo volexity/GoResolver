@@ -10,11 +10,14 @@ import ida_typeinf  # type: ignore[import-untyped,import-not-found]
 import idaapi  # type: ignore[import-untyped,import-not-found]
 from common.action_modes import ActionModes
 from common.chan_dirs import ChanDir
+from common.goresolver_interface import GoResolverInterface
 from common.plugin_exceptions import UserCancellationError
+from common.sre_action import SREAction
 from common.sre_interface import SREInterface
 from common.type_flag import TFlag
 from common.type_kind import Kind
 from ida_config_form import IDAConfigForm
+from ida_kernwin import ask_form
 from ida_typeinf import tinfo_t
 
 logging.basicConfig()
@@ -257,6 +260,7 @@ class IDAInterface(SREInterface):
 
         Returns: Path of the file opened in the SRE.
         """
+        # TODO: This may return an out-of-date path if the database was moved
         return Path(idaapi.get_input_file_path()).resolve()
 
     @override
@@ -268,7 +272,7 @@ class IDAInterface(SREInterface):
         return Path(idaapi.get_user_idadir()) / "GoResolver_data"
 
     @override
-    def getAction(self, restrict: list[ActionModes] | None = None) -> tuple[ActionModes, Path | None]:
+    def getAction(self, restrict: list[ActionModes] | None = None) -> SREAction:
         """Prompt the user for the action mode and report path.
 
         Args:
@@ -276,13 +280,26 @@ class IDAInterface(SREInterface):
 
         Returns: Action mode and report path.
         """
-        form: Final[IDAConfigForm] = IDAConfigForm(restrict=restrict)
-        if form.show():
-            mode: Final[ActionModes] = form.mode
-            report_path: Final[Path | None] = form.report_path
+        while True:
+            form: Final[IDAConfigForm] = IDAConfigForm(restrict=restrict)
+            if form.show():
+                if not form.selected_versions:
+                    self.showDialog("ERROR", "Please select a go version")
+                    print("Please select a go version")
+                    continue
+                GoResolverInterface.request_versions(form.requested_versions)
+                return SREAction(form.mode, form.report_path, form.selected_versions)
+            raise UserCancellationError
 
-            return (mode, report_path)
-        raise UserCancellationError
+    @override
+    def showDialog(self, title: str, message: str) -> None:
+        """Display a dialog to the user with the provided title and message.
+
+        Args:
+            title: The title of the dialog window.
+            message: The message content of the dialog window.
+        """
+        ask_form(f"""{title}\n\n{message}""")
 
     @override
     def print(self, string: str) -> None:

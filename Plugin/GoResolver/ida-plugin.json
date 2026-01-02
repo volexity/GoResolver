@@ -2,6 +2,45 @@
   "IDAMetadataDescriptorVersion": 1,
   "plugin": {
     "name": "GoResolver",
-    "entryPoint": "goresolver_ida.py"
+    "version": "1.4.0",
+    "idaVersions": [
+      "9.0",
+      "9.1",
+      "9.2"
+    ],
+    "platforms": [
+      "windows-x86_64",
+      "linux-x86_64",
+      "macos-x86_64",
+      "macos-aarch64"
+    ],
+    "description": "GoResolver plugin for IDA Pro.",
+    "license": "Modified BSD License",
+    "categories": [
+      "deobfuscation",
+      "malware-analysis"
+    ],
+    "keywords": [
+      "Go",
+      "Golang",
+      "Similarity Analysis",
+      "Symbols Recovery",
+      "Control Flow Graphs"
+    ],
+    "pythonDependencies": [
+      "goresolver>=1.4.0"
+    ],
+    "entryPoint": "goresolver_ida.py",
+    "urls": {
+      "repository": "https://github.com/volexity/GoResolver"
+    },
+    "authors": [{
+      "name": "Killian RAIMBAUD",
+      "email": "kraimbaud@volexity.com"
+    }],
+    "maintainers": [{
+      "name": "Killian RAIMBAUD",
+      "email": "kraimbaud@volexity.com"
+    }]
   }
 }

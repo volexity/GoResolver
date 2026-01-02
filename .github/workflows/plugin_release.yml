@@ -1,0 +1,27 @@
+name: Create new plugin release
+
+on:
+    push:
+        tags: [v*]
+
+permissions:
+    contents: write
+
+jobs:
+    create-zip:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Create plugin release
+              uses: thedoctor0/zip-release@0.7.5
+              with:
+                type: 'zip'
+                filename: 'GoResolver-Plugin-${{ github.ref_name }}.zip'
+                directory: 'Plugin/GoResolver'
+
+            - name: Upload plugin release
+              uses: ncipollo/release-action@v1.12.0
+              with:
+                artifacts: "Plugin/GoResolver/GoResolver-Plugin-${{ github.ref_name }}.zip"
+                token: ${{ secrets.GITHUB_TOKEN }}

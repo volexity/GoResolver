@@ -1,1 +1,1 @@
-"""."""
+"""GoResolver models module."""

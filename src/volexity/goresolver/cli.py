@@ -2,9 +2,7 @@
 
 import contextlib
 import logging
-import shutil
 import sys
-from cmd import Cmd
 from logging import INFO, Logger, basicConfig, getLogger
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
@@ -14,11 +12,10 @@ from gographer import CompareReport, UnsupportedBinaryFormat
 from pygments import highlight  # type: ignore[reportUnknownVariableType]
 from pygments.formatters import TerminalFormatter
 from pygments.lexers.web import JsonLexer  # type: ignore[reportMissingTypeStubs]
-
 from volexity.gostrap.sample_generator import SampleGenerator
 
 from .go_compare import GoCompare
-from .models.cli_arguments import CLIArguments
+from .models.cli_arguments import CLIArguments, CLIManageArguments, CLIResolveArguments
 from .models.symbol_report import SymbolReport
 from .models.symbol_source import SymbolSource
 from .models.symbol_tree import SymbolTree
@@ -41,30 +38,25 @@ logging.getLogger("volexity.gostrap").setLevel(logging.INFO)
 logger: Final[Logger] = getLogger(__name__)
 
 
-def show_versions(generator: SampleGenerator) -> None:
-    """Prints the available GO versions to the screen.
+def run_cli() -> None:
+    """Implements the GoResolver's command line interface."""
+    args: Final[CLIArguments] = CLIArguments.parse_args(sys.argv)
 
-    Args:
-        generator: Instance to retrieve the available versions from.
-    """
-    available: Final[list[str]] = [*generator.get_available_go_versions()]
-    cmd: Final[Cmd] = Cmd()
-    cmd.columnize(available, displaywidth=shutil.get_terminal_size().columns)
-    sys.exit()
-
-
-def run_cli() -> None:  # noqa: PLR0915
-    """Implements the GoGrapher-py command line interface."""
     storage_path: Final[Path] = Path("./storage")
-    args: Final[CLIArguments] = CLIArguments(sys.argv)
-    symbol_tree: Final[SymbolTree] = SymbolTree()
+    generator: Final[SampleGenerator] = SampleGenerator(storage_path, display_progress=not args.quiet)
 
-    generator: Final[SampleGenerator] = SampleGenerator(storage_path, display_progress=True)
+    match args:
+        case CLIResolveArguments():
+            return resolve(args, generator)
+        case CLIManageArguments():
+            return manage(args, generator)
+
+
+def resolve(args: CLIResolveArguments, generator: SampleGenerator) -> None:
+    """Implements GoResolver's resolve command."""
+    symbol_tree: Final[SymbolTree] = SymbolTree()
     sample_bin: Final[Binary] = Binary(args.sample_path)
     compare_report: CompareReport | None = None
-
-    if args.show:
-        show_versions(generator)
 
     # STEP 1: Extract symbols through similarities
     if args.use_graph:
@@ -73,7 +65,7 @@ def run_cli() -> None:  # noqa: PLR0915
                 compare_report = CompareReport.from_json(report_file.read())
         else:
             go_comparator: Final[GoCompare] = GoCompare(
-                generator, sample_bin, reference_path=args.reference_path, display_progress=True
+                generator, sample_bin, reference_path=args.reference_path, display_progress=not args.quiet
             )
 
             try:
@@ -124,17 +116,33 @@ def run_cli() -> None:  # noqa: PLR0915
                         logger.debug(f"{method_match.malware_offset:#0x} - {method_match.resolved_name} : {e}")
 
     # STEP 5: Generate the final JSON report.
-    report_json: Final[str] = SymbolReport(sample_bin.path, symbol_tree, gotypes_address, type_dict).to_json(
-        pretty=True
-    )
+    report_json: str = SymbolReport(sample_bin.path, symbol_tree, gotypes_address, type_dict).to_json(pretty=True)
 
     # STEP 5.1: Print colorized report to the terminal.
-    if not args.quiet:
-        report_colorized: Final[str] = highlight(report_json, JsonLexer(), TerminalFormatter())
-        print(f"Report: {report_colorized}")  # noqa: T201
+    if sys.stdout.isatty():
+        report_json = highlight(report_json, JsonLexer(), TerminalFormatter())
+
+    print(report_json)  # noqa: T201
 
     # STEP 5.2: If required, then write report to disk.
     if args.output:
         with args.output.open("w") as output_file:
             output_file.write(report_json)
         logger.info(f"Report written to {args.output}")
+
+
+def manage(args: CLIManageArguments, generator: SampleGenerator) -> None:
+    """Implements GoResolver's manage command."""
+    if args.list_available:
+        for ver in generator.get_available_go_versions():
+            print(ver)  # noqa: T201
+
+    elif args.list_installed:
+        for ver in generator.get_installed_go_versions():
+            print(ver)  # noqa: T201
+
+    elif args.install:
+        generator.add_go_versions(*args.install)
+
+    elif args.uninstall:
+        generator.del_go_version(*args.uninstall)

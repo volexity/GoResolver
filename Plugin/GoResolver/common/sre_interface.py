@@ -8,6 +8,7 @@ from typing import Final
 
 from .action_modes import ActionModes
 from .plugin_exceptions import ReportDecodeError
+from .sre_action import SREAction
 
 logger: Final[logging.Logger] = logging.getLogger(f"volexity.goresolver_plugin.{__name__}")
 
@@ -72,13 +73,22 @@ class SREInterface(ABC):
         """
 
     @abstractmethod
-    def getAction(self, *, restrict: list[ActionModes] | None = None) -> tuple[ActionModes, Path | None]:
+    def getAction(self, *, restrict: list[ActionModes] | None = None) -> SREAction:
         """Prompt the user for the action mode and report path.
 
         Args:
             restrict: Disable the select action modes.
 
         Returns: Action mode and report path.
+        """
+
+    @abstractmethod
+    def showDialog(self, title: str, message: str) -> None:
+        """Display a dialog to the user with the provided title and message.
+
+        Args:
+            title: The title of the dialog window.
+            message: The message content of the dialog window.
         """
 
     @abstractmethod
