@@ -2,7 +2,7 @@
   "IDAMetadataDescriptorVersion": 1,
   "plugin": {
     "name": "GoResolver",
-    "version": "1.4.0",
+    "version": "1.4.1",
     "idaVersions": [
       "9.0",
       "9.1",

@@ -21,13 +21,19 @@ This plugin depends on GoResolver to function. Regardless of the SRE tool you us
 
 ### IDA
 
-The easiest way to install the GoResolver plugin is through hcli. Simply run the following command with the plugin archive downloaded from this repository's release section :
+The easiest way to install the GoResolver plugin is through hcli and Hex-Rays plugin repository. Simply run the following command:
+
+```bash
+hcli plugin install GoResolver
+```
+
+This will install the plugin and its required dependencies.
+
+It is also possible to install with the plugin archive downloaded from this repository's release section with the following command:
 
 ```bash
 hcli plugin install GoResolver.zip
 ```
-This will install the plugin and its required dependencies.
-
 
 To install the IDA plugin from source copy the following files to the `~/.idapro/plugins/goresolver` directory :
 

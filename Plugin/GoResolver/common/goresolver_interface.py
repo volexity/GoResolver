@@ -78,7 +78,7 @@ class GoResolverInterface:
         Retuns:
             GoResolver's report output.
         """
-        return GoResolverInterface._run_goresolver("resolve", "-v", ",".join(go_versions), str(file_path))
+        return GoResolverInterface._run_goresolver("resolve", "-y", "-v", ",".join(go_versions), str(file_path))
 
     @staticmethod
     def install(go_versions: list[str]) -> str:
