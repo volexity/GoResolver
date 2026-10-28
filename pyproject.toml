@@ -25,7 +25,7 @@ dependencies = [
   "gographer~=1.2.2",
   "gostrap~=1.1.2",
   "pygments~=2.18.0",
-  "lief~=0.16.4",
+  "lief>=0.16.4",
   "yara-python~=4.5.1",
   "multiprocess~=0.70.18"
 ]

@@ -269,13 +269,17 @@ class Binary:
         Returns:
             The translated virtual address.
         """
-        virtual_address: Final[int | lief.lief_errors] = self._parsed_binary.offset_to_virtual_address(offset)
+        # For PE files LIEF < 1.0 returns an RVA while LIEF >= 1.0 returns a VA,
+        # use a slide to always return a VA
+        slide: int = 0
+        if self.format == BinaryFormat.PE:
+            slide = self._parsed_binary.imagebase
+
+        virtual_address: Final[int | lief.lief_errors] = self._parsed_binary.offset_to_virtual_address(offset, slide)
         if isinstance(virtual_address, lief.lief_errors):
             msg = "Invalid offset!"
             raise TypeError(msg)
 
-        if self.format == BinaryFormat.PE:  # Resolve RVA for PEs
-            return virtual_address + self._parsed_binary.imagebase
         return virtual_address
 
     def get_offset_from_address(self, address: int) -> int:
